@@ -7,6 +7,7 @@ import SignupScreen from "./screens/SignupScreen";
 import OtpLoginScreen from "./screens/OtpLoginScreen";
 import RepairNowScreen from "./screens/RepairNowScreen";
 import TrackingScreen from "./screens/TrackingScreen";
+import ProductDetails from "./screens/ProductDetail";
 
 const Stack = createStackNavigator();
 
@@ -19,6 +20,7 @@ export default function App() {
         <Stack.Screen name="OtpLoginScreen" component={OtpLoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="RepairNowScreen" component={RepairNowScreen} options={{ headerShown: false }} />
         <Stack.Screen name="TrackingScreen" component={TrackingScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ProductDetails" component={ProductDetails} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

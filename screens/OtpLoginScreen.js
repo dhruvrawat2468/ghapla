@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   View, Text, TextInput, TouchableOpacity, StyleSheet, 
@@ -7,18 +6,20 @@ import {
 import { useNavigation } from "@react-navigation/native";
 
 export default function OtpLoginScreen() {
+  // State to store user input for mobile number and OTP
   const [mobileNumber, setMobileNumber] = useState("");
   const [otp, setOtp] = useState("");
   const navigation = useNavigation();
 
   return (
     <View style={styles.container}>
-      {/* Profile Image */}
+      {/* Display Image */}
       <Image 
         source={require("../assets/images/user2.png")}  
         style={styles.profileImage} 
       />
       
+      {/* KeyboardAvoidingView ensures a better input experience on mobile */}
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : "height"} 
         style={styles.innerContainer}
@@ -27,18 +28,15 @@ export default function OtpLoginScreen() {
           contentContainerStyle={styles.scrollContainer} 
           keyboardShouldPersistTaps="handled"
         >
-          {/* Title */}
+          {/* Page Title */}
           <Text style={styles.title}>OTP Login</Text>
 
-          {/* Subtitle */}
-          
+          {/* Instructional Subtitle */}
           <Text style={styles.subtitle}>
             Enter your mobile number to receive an OTP
           </Text>
-         
-          
 
-          {/* Mobile Number */}
+          {/* Input for Mobile Number */}
           <Text style={styles.label}>Mobile Number</Text>
           <TextInput 
             style={styles.input} 
@@ -50,7 +48,7 @@ export default function OtpLoginScreen() {
             onChangeText={setMobileNumber}
           />
 
-          {/* OTP */}
+          {/* Input for OTP */}
           <Text style={styles.label}>OTP</Text>
           <TextInput 
             style={styles.input} 
@@ -62,12 +60,12 @@ export default function OtpLoginScreen() {
             onChangeText={setOtp}
           />
 
-          {/* Verify OTP Button */}
+          {/* Button to Verify OTP */}
           <TouchableOpacity style={styles.button}>
             <Text style={styles.buttonText}>VERIFY OTP</Text>
           </TouchableOpacity>
 
-          {/* Navigate to Login */}
+          {/* Navigate back to Login Screen */}
           <Text style={styles.signupText}>
             Go back to<Text style={styles.signupLink} onPress={() => navigation.navigate("LoginScreen")}>
               {" "}Login
@@ -76,7 +74,7 @@ export default function OtpLoginScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Curved Bottom Image */}
+      {/* Decorative Bottom Image */}
       <Image 
         source={require("../assets/images/img3.jpeg")}  
         style={styles.bottomImage} 
@@ -107,8 +105,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingBottom: 100,
   },
-
-    title: {
+  title: {
     fontSize: 32,
     fontWeight: "bold",
     color: "#000",
@@ -120,7 +117,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 50,
   },
- 
   label: {
     alignSelf: "flex-start",
     fontSize: 14,
@@ -162,5 +158,4 @@ const styles = StyleSheet.create({
     height: 100, 
     resizeMode: "cover",
   },
-  
 });

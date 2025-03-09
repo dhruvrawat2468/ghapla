@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   View, Text, TextInput, TouchableOpacity, StyleSheet, 
@@ -8,35 +7,43 @@ import { useNavigation } from "@react-navigation/native";
 import axios from "axios";
 
 export default function LoginScreen() {
+  // State variables to store user input
   const [mobileNumber, setMobileNumber] = useState("");
   const [password, setPassword] = useState("");
   const navigation = useNavigation();
 
+  // Function to handle login
   const handleLogin = async () => {
+    // Check if both fields are filled
     if (!mobileNumber || !password) {
       Alert.alert("Error", "Please enter both mobile number and password");
       return;
     }
 
     try {
+      // Sending login request to backend
       const response = await axios.post("http://your-backend-ip:5000/login", {
         mobileNumber,
         password,
       });
 
       Alert.alert("Success", response.data.message);
-      navigation.navigate("HomeScreen"); // Navigate to home screen after login
+      // Navigate to HomeScreen on successful login
+      navigation.navigate("HomeScreen");
     } catch (error) {
+      // Show error message if login fails
       Alert.alert("Error", error.response?.data?.message || "Login failed");
     }
   };
 
   return (
     <View style={styles.container}>
+      {/* Profile Image */}
       <Image 
         source={require("../assets/images/user2.png")}  
         style={styles.profileImage} 
       />
+      
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : "height"} 
         style={styles.innerContainer}
@@ -45,9 +52,11 @@ export default function LoginScreen() {
           contentContainerStyle={styles.scrollContainer} 
           keyboardShouldPersistTaps="handled"
         >
+          {/* Title and Subtitle */}
           <Text style={styles.title}>Sign in</Text>
           <Text style={styles.subtitle}>Welcome back to your trusted electric repair app!</Text>
 
+          {/* Mobile Number Input */}
           <Text style={styles.label}>Mobile Number</Text>
           <TextInput 
             style={styles.input} 
@@ -59,6 +68,7 @@ export default function LoginScreen() {
             onChangeText={setMobileNumber}
           />
           
+          {/* Password Input */}
           <Text style={styles.label}>Password</Text>
           <TextInput 
             style={styles.input} 
@@ -69,12 +79,15 @@ export default function LoginScreen() {
             onChangeText={setPassword}
           />
 
+          {/* Login Button */}
           <TouchableOpacity style={styles.button} onPress={handleLogin}>
             <Text style={styles.buttonText}>SIGN IN</Text>
           </TouchableOpacity>
 
+          {/* OR Separator */}
           <Text style={styles.orText}>or</Text>
 
+          {/* Login with OTP Button */}
           <TouchableOpacity 
             style={styles.otpButton} 
             onPress={() => navigation.navigate("OtpLoginScreen")}
@@ -82,6 +95,7 @@ export default function LoginScreen() {
             <Text style={styles.otpButtonText}>LOGIN WITH OTP</Text>
           </TouchableOpacity>
 
+          {/* Signup Link */}
           <Text style={styles.signupText}>
             Don't have an account? 
             <Text 
@@ -94,6 +108,7 @@ export default function LoginScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
+      {/* Bottom Decorative Image */}
       <Image 
         source={require("../assets/images/img3.jpeg")}  
         style={styles.bottomImage} 
@@ -102,6 +117,7 @@ export default function LoginScreen() {
   );
 }
 
+// Styles for the components
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   innerContainer: { flex: 1, paddingHorizontal: 20 },

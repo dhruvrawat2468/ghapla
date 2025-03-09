@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import CarouselImageComponent from '../components/CarouselImageComponent';
@@ -21,10 +20,11 @@ const RepairNowScreen = () => {
         <OurServices />
       </View>
 
+      {/**Repair at your fingertips section */}
       <View style={styles.solutionWrapper}>
         <SolutionsComponent />
       </View>
-
+      {/**Repair big section */}
       <View style={styles.solutionWrapper}>
         <RepairBig />
       </View>

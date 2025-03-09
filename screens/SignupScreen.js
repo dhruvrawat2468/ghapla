@@ -158,6 +158,11 @@ export default function SignupScreen() {
             Tracking screen? <Text style={styles.signupLink} onPress={() => navigation.navigate("TrackingScreen")}>Click</Text>
           </Text>
 
+          <Text style={styles.signupText}>
+            Product detail screen? <Text style={styles.signupLink} onPress={() => navigation.navigate("ProductDetails")}>Click</Text>
+          </Text>
+
+
         </ScrollView>
       </KeyboardAvoidingView>
 
