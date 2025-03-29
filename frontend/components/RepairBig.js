@@ -96,7 +96,7 @@ const AnimatedCarousel = () => {
 // Styles for the component
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#0a2540", // Dark background for contrast
+    backgroundColor: "white", // white background for contrast
     paddingVertical: 15, // Adds spacing at the top and bottom
   },
   headingContainer: {
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#2b6cb0", // Blue border
+    borderColor: "#f2962c", // orange border
     marginBottom: 10, // Fix marginBottom value
   },
   heading: {
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   card: {
     width: width * 0.28, // Adjust width dynamically based on screen size
     height: 140, // Reduced height for compact layout
-    backgroundColor: "#2b6cb0", // Blue background
+    backgroundColor: "#f5e6b5", // light orange background
     borderRadius: 12, // Rounded corners
     marginHorizontal: 5, // Space between cards
     alignItems: "center",
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 6,
     right: 6,
-    backgroundColor: "gold",
+    backgroundColor: "white",
     color: "black",
     fontSize: 10, // Reduced font size for better fit
     paddingHorizontal: 4,

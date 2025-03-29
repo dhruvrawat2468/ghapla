@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 30, 
         fontWeight: 'bold',
-        marginTop: -5,
+        marginTop: 65,
         color: '#575757',
         fontFamily: 'ROBOTA', // Custom font (make sure it's available)
         letterSpacing: 1, 

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, Dimensions } from 'react-native';
 import Carousel from 'react-native-reanimated-carousel';
 import { LinearGradient } from 'expo-linear-gradient';
+import SearchBar from './SearchBar';
 
 // Get the width of the device screen
 const { width } = Dimensions.get('window');
@@ -13,35 +14,40 @@ const images = [
   { id: 3, source: require('../assets/images/i3.png') },
 ];
 
+
 const CarouselImageComponent = () => {
+  const [selectedSearch, setSelectedSearch] = useState('');
+  
   return (
     <View style={styles.wrapper}>
       {/* Container for the Carousel with gradient background */}
       <View style={styles.carouselContainer}>
         <LinearGradient
-          colors={['#FFF5E1', '#FFFFFF']} // Light gradient background
+          colors={['#FFF5E1', '#FFFFFF']}
           style={styles.gradientBackground}
         >
           {/* Carousel component */}
           <Carousel
-            data={images} // Array of images
+            data={images}
             renderItem={({ item }) => (
               <View style={styles.slide}>
                 <Image source={item.source} style={styles.image} />
               </View>
             )}
-            width={width * 1.1} // Width of the carousel items
-            height={260} // Height of the carousel items
-            loop // Enables infinite scrolling
-            autoPlay // Enables automatic slide transitions
-            mode="parallax" // Adds a parallax effect to slides
+            width={width * 1.1}
+            height={260}
+            loop
+            autoPlay
+            mode="parallax"
             modeConfig={{
-              parallaxScrollingScale: 0.8, // Scale of non-active items
-              parallaxScrollingOffset: 40, // Offset for the parallax effect
+              parallaxScrollingScale: 0.8,
+              parallaxScrollingOffset: 40,
             }}
           />
         </LinearGradient>
       </View>
+      {/* Move SearchBar here, outside the gradient but inside the wrapper */}
+      <SearchBar onSearchSelect={setSelectedSearch} />
     </View>
   );
 };
@@ -51,7 +57,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     backgroundColor: '#fff',
-    paddingTop: 20,
+    paddingTop: 70,
   },
   carouselContainer: {
     height: 200,

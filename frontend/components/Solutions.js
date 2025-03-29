@@ -37,7 +37,7 @@ const SolutionsComponent = () => {
 
   return (
     <LinearGradient
-      colors={['#Fff3db', '#fff3db', '#C6FCFF']} // Soft pink to skyish gradient
+      colors={['#Fff3db', '#fff3db', '#FFFFFF']} // Soft pink to skyish gradient
       start={{ x: 0.8, y: 0 }} // Gradient starts at the right side
       end={{ x: 1, y: 1 }} // Gradient ends at the bottom-right corner
       style={styles.outerContainer}

@@ -39,9 +39,9 @@ export default function LoginScreen() {
         // ✅ Store JWT token for authentication
         await AsyncStorage.setItem("token", response.data.token);
   
-        Alert.alert("Success", "Logged in successfully!");
+       // Alert.alert("Success", "Logged in successfully!");
         setTimeout(() => {
-          navigation.navigate("FrontPage"); // Navigate after 3 seconds
+          navigation.navigate("RepairNowScreen"); // Navigate after 3 seconds
         },);
 
      // ✅ Navigate on success

@@ -80,9 +80,9 @@ const SearchBar = ({ onSearchSelect }) => {
 const styles = StyleSheet.create({
     container: {
         position: 'absolute', // Keeps search bar positioned at a fixed location
-        bottom: 230,
-        left: 20,
-        right: 20,
+        bottom: -40,
+        left: 40,
+        right: 40,
     },
     searchContainer: {
         height: 40,
