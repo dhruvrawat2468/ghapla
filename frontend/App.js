@@ -1,4 +1,4 @@
-
+/*
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
@@ -27,3 +27,42 @@ export default function App() {
     </NavigationContainer>
   );
 }
+*/
+// App.js
+import React from 'react';
+import TaskDetailScreen from './screens/TaskDetailsScreen';
+import TrackingStatusScreen from './screens/TrackingStatusScreen';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+
+const Stack = createStackNavigator();
+
+export default function App() {
+  const mockTask = {
+    customer: "John Doe",
+    address: "221B Baker Street, London",
+    phone: "9876543210",
+    serviceType: "Repair at Home",
+    orderId: "2001",
+  };
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator>
+        <Stack.Screen
+          name="TaskDetail"
+          component={TaskDetailScreen}
+          initialParams={{ task: mockTask }}
+        />
+        <Stack.Screen
+          name="TrackingStatus"
+          component={TrackingStatusScreen}
+          initialParams={{ orderId: mockTask.orderId }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+
+

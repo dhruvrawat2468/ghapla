@@ -1,4 +1,5 @@
-import mongoose from "mongoose"; // ✅ Use ES Module Import
+// orderStatus.js
+import mongoose from "mongoose";
 
 const orderStatusSchema = new mongoose.Schema({
   orderId: { type: String, required: true, unique: true },
@@ -7,8 +8,16 @@ const orderStatusSchema = new mongoose.Schema({
     enum: ["Product Picked", "Cost Verification", "Repair in Progress", "Ready to Deliver"],
     required: true,
   },
-  updatedAt: { type: Date, default: Date.now }
+  repairDetails: [
+    {
+      whatRepaired: { type: String },
+      cost: { type: Number },
+    },
+  ],
+  cost: { type: Number, default: null },
+  paymentStatus: { type: String, enum: ['incomplete', 'pending', 'completed'], default: 'incomplete' },
+  updatedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 
 const OrderStatus = mongoose.model("OrderStatus", orderStatusSchema);
-export default OrderStatus; // ✅ Use ES Module Export
+export default OrderStatus;
