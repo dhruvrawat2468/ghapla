@@ -25,7 +25,7 @@ const CurrentOrderScreen = ({ navigation }) => {
     status: "In Progress",
     eta: "Today by 4:30 PM",
     progress: 65,
-    serviceType: "Home Repair",
+    serviceType: "Pickup & Drop",
   };
 
   const handleTrackPress = () => {

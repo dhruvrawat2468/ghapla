@@ -31,7 +31,7 @@ import LoginScreenA from "./components/sample";
 import MainLayout from "./components/MainLayout";
 
 // Project B Screens
-import LoginScreen from "./screens/LoginScreen";
+
 import SignupScreen from "./screens/SignupScreen";
 import OtpLoginScreen from "./screens/OtpLoginScreen";
 import RepairNowScreen from "./screens/RepairNowScreen";
@@ -88,7 +88,7 @@ const HomeStack = () => {
         name="CurrentOrder"
         component={withMainLayout(CurrentOrder)}
       />
-      <Stack.Screen name="Login" component={withMainLayout(LoginScreen)} />
+
       <Stack.Screen name="Signup" component={withMainLayout(SignupScreen)} />
       <Stack.Screen
         name="OtpLogin"

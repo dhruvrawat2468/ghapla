@@ -219,34 +219,45 @@ const TrackingStatusScreen = () => {
           </TouchableOpacity>
         </Card>
 
-        {/* COST ESTIMATE MODAL */}
+        {/* Cost Estimate Modal */}
         <Modal visible={showCostEstimate} transparent animationType="slide">
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Cost Estimate</Text>
-              <View style={styles.divider} />
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <Text style={styles.modalTitle}>Cost Estimate Verification</Text>
+              <View style={styles.modalDivider} />
 
-              <Text style={styles.modalText}>
-                Issue Diagnosed: Water damage
-              </Text>
-              <Text style={styles.modalText}>
-                Parts to be replaced: Charging port
-              </Text>
-              <Text style={styles.modalText}>Estimated Repair Cost: ₹2500</Text>
+              <View style={styles.costDetailContainer}>
+                <View style={styles.costDetailRow}>
+                  <Text style={styles.costDetailLabel}>Issue Diagnosed:</Text>
+                  <Text style={styles.costDetailValue}>Water damage</Text>
+                </View>
+
+                <View style={styles.costDetailRow}>
+                  <Text style={styles.costDetailLabel}>Parts to replace:</Text>
+                  <Text style={styles.costDetailValue}>Charging port</Text>
+                </View>
+
+                <View style={styles.costTotalRow}>
+                  <Text style={styles.costTotalLabel}>
+                    Total Estimated Cost:
+                  </Text>
+                  <Text style={styles.costTotalValue}>₹2500</Text>
+                </View>
+              </View>
 
               <View style={styles.modalButtonContainer}>
                 <TouchableOpacity
-                  style={[styles.modalButton, { backgroundColor: "#28a745" }]}
-                  onPress={handleAcceptCost}
-                >
-                  <Text style={styles.modalButtonText}>Accept</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.modalButton, { backgroundColor: "#dc3545" }]}
+                  style={[styles.modalButton, styles.declineButton]}
                   onPress={handleDeclineCost}
                 >
                   <Text style={styles.modalButtonText}>Decline</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.acceptButton]}
+                  onPress={handleAcceptCost}
+                >
+                  <Text style={styles.modalButtonText}>Accept</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -418,13 +429,14 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: "#ccc",
   },
-  modalContainer: {
+  // Modal Styles
+  modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
-  modalContent: {
+  modalContainer: {
     width: "85%",
     backgroundColor: "#fff",
     borderRadius: 10,
@@ -432,14 +444,51 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   modalTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 10,
+    color: "#fd7e14",
     textAlign: "center",
+    marginBottom: 10,
   },
-  modalText: {
-    fontSize: 16,
+  modalDivider: {
+    height: 1,
+    backgroundColor: "#e0e0e0",
+    marginVertical: 10,
+  },
+  costDetailContainer: {
+    marginVertical: 10,
+  },
+  costDetailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 8,
+  },
+  costDetailLabel: {
+    fontSize: 16,
+    color: "#555",
+    fontWeight: "600",
+  },
+  costDetailValue: {
+    fontSize: 16,
+    color: "#333",
+  },
+  costTotalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 15,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#e0e0e0",
+  },
+  costTotalLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#555",
+  },
+  costTotalValue: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#fd7e14",
   },
   modalButtonContainer: {
     flexDirection: "row",
@@ -447,15 +496,22 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   modalButton: {
-    flex: 0.45,
-    paddingVertical: 10,
-    borderRadius: 8,
+    flex: 1,
+    padding: 12,
+    borderRadius: 6,
     alignItems: "center",
+    marginHorizontal: 5,
+  },
+  declineButton: {
+    backgroundColor: "#dc3545",
+  },
+  acceptButton: {
+    backgroundColor: "#28a745",
   },
   modalButtonText: {
-    fontSize: 16,
-    fontWeight: "bold",
     color: "white",
+    fontWeight: "bold",
+    fontSize: 16,
   },
 });
 

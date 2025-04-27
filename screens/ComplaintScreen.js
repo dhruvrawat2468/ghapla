@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -9,107 +9,14 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  PermissionsAndroid,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Audio } from "expo-av";
 
 const ComplaintScreen = () => {
   const [complaintType, setComplaintType] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [recording, setRecording] = useState(null);
-  const [recordedAudio, setRecordedAudio] = useState(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [sound, setSound] = useState(null);
-
-  useEffect(() => {
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
-  }, [sound]);
-
-  const startRecording = async () => {
-    try {
-      const { status } = await Audio.requestPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission required",
-          "Please allow microphone access to record audio"
-        );
-        return;
-      }
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync(
-        Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY
-      );
-      await recording.startAsync();
-      setRecording(recording);
-      setIsRecording(true);
-    } catch (err) {
-      console.error("Failed to start recording", err);
-      Alert.alert("Error", "Failed to start recording");
-    }
-  };
-
-  const stopRecording = async () => {
-    try {
-      setIsRecording(false);
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      setRecordedAudio(uri);
-      setRecording(null);
-    } catch (err) {
-      console.error("Failed to stop recording", err);
-    }
-  };
-
-  const playRecording = async () => {
-    try {
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: recordedAudio },
-        { shouldPlay: true }
-      );
-      setSound(sound);
-      setIsPlaying(true);
-
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.didJustFinish) {
-          setIsPlaying(false);
-        }
-      });
-
-      await sound.playAsync();
-    } catch (err) {
-      console.error("Failed to play recording", err);
-    }
-  };
-
-  const stopPlaying = async () => {
-    if (sound) {
-      await sound.stopAsync();
-      setIsPlaying(false);
-    }
-  };
-
-  const deleteRecording = () => {
-    setRecordedAudio(null);
-    if (sound) {
-      sound.unloadAsync();
-      setSound(null);
-    }
-    setIsPlaying(false);
-  };
 
   const handleSubmit = () => {
     if (!complaintType || !title || !description) {
@@ -123,7 +30,6 @@ const ComplaintScreen = () => {
       complaintType,
       title,
       description,
-      audio: recordedAudio || null,
     });
 
     setTimeout(() => {
@@ -138,7 +44,6 @@ const ComplaintScreen = () => {
               setComplaintType("");
               setTitle("");
               setDescription("");
-              setRecordedAudio(null);
             },
           },
         ]
@@ -219,50 +124,6 @@ const ComplaintScreen = () => {
             multiline
             numberOfLines={5}
           />
-        </View>
-
-        {/* Voice recording section */}
-        <Text style={styles.label}>VOICE NOTE (OPTIONAL)</Text>
-        <View style={styles.recordingContainer}>
-          {recordedAudio ? (
-            <View style={styles.recordingControls}>
-              <TouchableOpacity
-                style={[styles.recordingButton, styles.playButton]}
-                onPress={isPlaying ? stopPlaying : playRecording}
-              >
-                <Ionicons
-                  name={isPlaying ? "stop-circle" : "play-circle"}
-                  size={24}
-                  color="#fff"
-                />
-                <Text style={styles.recordingButtonText}>
-                  {isPlaying ? "Stop" : "Play"}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.recordingButton, styles.deleteButton]}
-                onPress={deleteRecording}
-              >
-                <Ionicons name="trash-bin" size={20} color="#fff" />
-                <Text style={styles.recordingButtonText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[styles.recordingButton, styles.recordButton]}
-              onPress={isRecording ? stopRecording : startRecording}
-            >
-              <Ionicons
-                name={isRecording ? "stop-circle" : "mic"}
-                size={24}
-                color="#fff"
-              />
-              <Text style={styles.recordingButtonText}>
-                {isRecording ? "Stop Recording" : "Record Voice Note"}
-              </Text>
-            </TouchableOpacity>
-          )}
         </View>
 
         {/* Submit button */}
@@ -370,37 +231,6 @@ const styles = StyleSheet.create({
   radioTextSelected: {
     color: "#fd7e14",
     fontWeight: "600",
-  },
-  recordingContainer: {
-    marginBottom: 25,
-  },
-  recordingButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  recordButton: {
-    backgroundColor: "#fd7e14",
-  },
-  playButton: {
-    backgroundColor: "#28a745",
-    marginRight: 10,
-  },
-  deleteButton: {
-    backgroundColor: "#dc3545",
-  },
-  recordingButtonText: {
-    color: "#fff",
-    marginLeft: 8,
-    fontWeight: "600",
-  },
-  recordingControls: {
-    flexDirection: "row",
-    justifyContent: "space-between",
   },
   submitButton: {
     backgroundColor: "#fd7e14",
