@@ -12,7 +12,6 @@ import HeaderScreen from "./screens/HeaderScreen";
 import OrderDetailsScreen from "./screens/OrderDetailScreen";
 import TaskDetailScreen from "./screens/TaskDetailsScreen";
 import Profile from "./components/Profile";
-import Payouts from "./screens/Payout";
 
 import { ProductProvider } from "./context/ProductContext";
 import {
