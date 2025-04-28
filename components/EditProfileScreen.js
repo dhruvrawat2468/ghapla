@@ -55,39 +55,47 @@ const EditProfileScreen = ({ navigation }) => {
     setLoading(false);
   }, [userProfile]);
 
-  const isFormValid = () => {
+  const isChanged = () => {
+    if (!userProfile) return false;
     return (
-      updatedData.name.trim() !== "" &&
-      updatedData.email.includes("@") &&
-      updatedData.gender.trim() !== "" &&
-      updatedData.address.trim() !== "" &&
-      updatedData.houseNumber.trim() !== "" &&
-      updatedData.city.trim() !== "" &&
-      updatedData.pincode.trim().length === 6 &&
-      !isNaN(updatedData.age) &&
-      parseInt(updatedData.age) > 0
+      updatedData.name !== (userProfile.name || "") ||
+      updatedData.email !== (userProfile.email || "") ||
+      updatedData.gender !== (userProfile.gender || "") ||
+      updatedData.address !== (userProfile.address?.[0]?.address || "") ||
+      updatedData.landmark !== (userProfile.address?.[0]?.landmark || "") ||
+      updatedData.pincode !== (userProfile.address?.[0]?.pincode || "") ||
+      updatedData.houseNumber !== (userProfile.address?.[0]?.houseNumber || "") ||
+      updatedData.city !== (userProfile.address?.[0]?.city || "") ||
+      updatedData.age !== (userProfile.age ? userProfile.age.toString() : "")
     );
   };
 
   const handleSaveChanges = async () => {
+    if (!updatedData.email.includes("@")) {
+      Alert.alert("Error", "Invalid email format");
+      return;
+    }
+    if (isNaN(updatedData.age) || updatedData.age === "") {
+      Alert.alert("Error", "Age must be a number");
+      return;
+    }
+
     try {
       setSaving(true);
       const payload = {
         name: updatedData.name,
         email: updatedData.email,
         gender: updatedData.gender,
-        address: [
-          {
-            address: updatedData.address,
-            landmark: updatedData.landmark,
-            pincode: updatedData.pincode,
-            houseNumber: updatedData.houseNumber,
-            city: updatedData.city,
-          },
-        ],
+        address: [{
+          address: updatedData.address,
+          landmark: updatedData.landmark,
+          pincode: updatedData.pincode,
+          houseNumber: updatedData.houseNumber,
+          city: updatedData.city,
+        }],
         age: parseInt(updatedData.age),
       };
-
+      console.log("Sending payload:", payload);
       const response = await axios.put(
         "http://192.168.1.8:7000/api/other/profile/edit",
         payload,
@@ -95,16 +103,14 @@ const EditProfileScreen = ({ navigation }) => {
           headers: { Authorization: `Bearer ${userToken}` },
         }
       );
-
-      Alert.alert("Success", "Profile updated successfully!");
+      Alert.alert("Success", response.data.message);
       setUserProfile(response.data.user);
       navigation.goBack();
     } catch (error) {
       console.error("Error updating profile:", error);
       Alert.alert(
         "Error",
-        error.response?.data?.message ||
-          "Failed to update profile. Please try again."
+        error.response?.data?.message || "Failed to update profile. Server error occurred."
       );
     } finally {
       setSaving(false);
@@ -126,134 +132,205 @@ const EditProfileScreen = ({ navigation }) => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF8C00" />
-        <Animated.Text entering={FadeIn} style={styles.loadingText}>
-          Loading Profile...
-        </Animated.Text>
-      </View>
+      <LinearGradient colors={["#FFE0B2", "#F5F5F5"]} style={styles.loadingContainer}>
+        <Animated.View entering={FadeIn}>
+          <ActivityIndicator size="large" color="#FF4500" />
+          <Text style={styles.loadingText}>Loading Profile...</Text>
+        </Animated.View>
+      </LinearGradient>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar backgroundColor="#fff" barStyle="dark-content" />
-
+    <LinearGradient colors={["#FFE0B2", "#F5F5F5"]} style={styles.gradientContainer}>
+      <StatusBar backgroundColor="#FFE0B2" barStyle="dark-content" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Personal Info Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
-          {["name", "email", "gender", "age"].map((field) => (
-            <View key={field} style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>
-                {field.charAt(0).toUpperCase() + field.slice(1)}
-                {["name", "email", "gender", "age"].includes(field) && (
-                  <Text style={styles.required}> *</Text>
-                )}
-              </Text>
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  style={styles.input}
-                  placeholder={`Enter ${field}`}
-                  placeholderTextColor="#999"
-                  value={updatedData[field]}
-                  onChangeText={(text) =>
-                    setUpdatedData({
-                      ...updatedData,
-                      [field]:
-                        field === "age" ? text.replace(/[^0-9]/g, "") : text,
-                    })
-                  }
-                  keyboardType={
-                    field === "email"
-                      ? "email-address"
-                      : field === "age"
-                      ? "numeric"
-                      : "default"
-                  }
-                />
-                <Ionicons
-                  name={
-                    field === "name"
-                      ? "person-outline"
-                      : field === "email"
-                      ? "mail-outline"
-                      : field === "gender"
-                      ? "transgender-outline"
-                      : "calendar-outline"
-                  }
-                  size={20}
-                  color="#FF8C00"
-                  style={styles.inputIcon}
-                />
-              </View>
-            </View>
-          ))}
-        </View>
+        <Animated.View entering={FadeInDown.delay(200)}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color="#FF4500" />
+          </TouchableOpacity>
 
-        {/* Save Button */}
-        <TouchableOpacity
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          onPress={handleSaveChanges}
-          activeOpacity={0.9}
-          disabled={!isFormValid() || saving}
-        >
-          <Animated.View
-            style={[
-              styles.saveButton,
-              saveAnimatedStyle,
-              isFormValid() ? styles.enabledButton : styles.disabledButton,
-            ]}
+          <Text style={styles.header}>Edit Profile</Text>
+
+          {/* Personal Info Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Personal Information</Text>
+            {["name", "email", "gender", "age"].map((field) => (
+              <View key={field} style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>
+                  {field.charAt(0).toUpperCase() + field.slice(1)}
+                  <Text style={styles.required}> *</Text>
+                </Text>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={`Enter ${field}`}
+                    placeholderTextColor="#999"
+                    value={updatedData[field]}
+                    onChangeText={(text) =>
+                      setUpdatedData({
+                        ...updatedData,
+                        [field]:
+                          field === "age" ? text.replace(/[^0-9]/g, "") : text.trimStart(),
+                      })
+                    }
+                    keyboardType={
+                      field === "email"
+                        ? "email-address"
+                        : field === "age"
+                        ? "numeric"
+                        : "default"
+                    }
+                  />
+                  <Ionicons
+                    name={
+                      field === "name"
+                        ? "person-outline"
+                        : field === "email"
+                        ? "mail-outline"
+                        : field === "gender"
+                        ? "transgender-outline"
+                        : "calendar-outline"
+                    }
+                    size={20}
+                    color="#FF8C00"
+                    style={styles.inputIcon}
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* Address Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Address Information</Text>
+            {["address", "landmark", "pincode", "houseNumber", "city"].map((field) => (
+              <View key={field} style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>
+                  {field.charAt(0).toUpperCase() + field.slice(1)}
+                  {["address", "houseNumber", "city", "pincode"].includes(field) && (
+                    <Text style={styles.required}> *</Text>
+                  )}
+                </Text>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={`Enter ${field}`}
+                    placeholderTextColor="#999"
+                    value={updatedData[field]}
+                    onChangeText={(text) =>
+                      setUpdatedData({
+                        ...updatedData,
+                        [field]: field === "pincode" ? text.replace(/[^0-9]/g, "") : text.trimStart(),
+                      })
+                    }
+                    keyboardType={field === "pincode" ? "numeric" : "default"}
+                  />
+                  <Ionicons
+                    name={
+                      field === "address"
+                        ? "location-outline"
+                        : field === "landmark"
+                        ? "pin-outline"
+                        : field === "pincode"
+                        ? "keypad-outline"
+                        : field === "houseNumber"
+                        ? "home-outline"
+                        : "business-outline"
+                    }
+                    size={20}
+                    color="#FF8C00"
+                    style={styles.inputIcon}
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* Save Button */}
+          <TouchableOpacity
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            onPress={handleSaveChanges}
+            activeOpacity={0.9}
+            disabled={!isChanged() || saving}
           >
-            <LinearGradient
-              colors={
-                isFormValid() ? ["#FF8C00", "#FF6B00"] : ["#CCCCCC", "#999999"]
-              }
-              style={styles.gradientButton}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+            <Animated.View
+              style={[
+                styles.saveButton,
+                saveAnimatedStyle,
+                isChanged() ? styles.enabledButton : styles.disabledButton,
+              ]}
             >
-              {saving ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="save-outline" size={20} color="#fff" />
-                  <Text style={styles.saveButtonText}>Save Changes</Text>
-                </>
-              )}
-            </LinearGradient>
-          </Animated.View>
-        </TouchableOpacity>
+              <LinearGradient
+                colors={
+                  isChanged() ? ["#FF8C00", "#FF6B00"] : ["#CCCCCC", "#999999"]
+                }
+                style={styles.gradientButton}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="save-outline" size={20} color="#fff" />
+                    <Text style={styles.saveButtonText}>Save Changes</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </Animated.View>
+          </TouchableOpacity>
+        </Animated.View>
       </ScrollView>
-    </View>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  gradientContainer: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
-    paddingTop: 20,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
   },
   loadingText: {
-    marginTop: 20,
+    marginTop: 15,
     fontSize: 16,
     color: "#666",
     fontWeight: "500",
+    textAlign: "center",
   },
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 40,
+    paddingTop: 20,
+  },
+  backButton: {
+    marginBottom: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  header: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 25,
   },
   section: {
     marginBottom: 25,

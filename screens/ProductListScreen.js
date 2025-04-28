@@ -26,37 +26,39 @@ const ProductListScreen = () => {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Temporary mock data instead of API
-    const mockDevices = [
-      { name: "AC", serviceMode: "Home Repair" },
-      { name: "Fridge", serviceMode: "Pickup & Drop" },
-      { name: "Laptop", serviceMode: "Home Repair" },
-      { name: "Television", serviceMode: "Home Repair" },
-      { name: "Microwave", serviceMode: "Pickup & Drop" },
-      { name: "Washing Machine", serviceMode: "Home Repair" },
-      { name: "Mobile Phone", serviceMode: "Pickup & Drop" },
-      { name: "Geyser", serviceMode: "Home Repair" },
-    ];
+    const fetchDevices = async () => {
+      try {
+        const response = await fetch("http://192.168.1.8:7000/api/devices/all");
+        if (!response.ok) throw new Error("Failed to fetch devices");
+        const devices = await response.json();
+        console.log("Raw devices:", devices); // Debug backend data
 
-    const mappedProducts = mockDevices.reduce((acc, device) => {
-      const appCategory = device.serviceMode;
-      const existing = acc.find((d) => d.name === device.name);
-      if (existing) {
-        if (!existing.categories.includes(appCategory)) {
-          existing.categories.push(appCategory);
-        }
-      } else {
-        acc.push({
-          name: device.name,
-          categories: [appCategory],
-          image: getImageForDevice(device.name),
-        });
+        const mappedProducts = devices.reduce((acc, device) => {
+          const appCategory = device.serviceMode;
+          const existing = acc.find((d) => d.name === device.name);
+          if (existing) {
+            if (!existing.categories.includes(appCategory)) {
+              existing.categories.push(appCategory);
+            }
+          } else {
+            acc.push({
+              name: device.name,
+              categories: [appCategory],
+              image: getImageForDevice(device.name),
+            });
+          }
+          return acc;
+        }, []);
+
+        setProducts(mappedProducts);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching devices:", error);
+        setLoading(false);
       }
-      return acc;
-    }, []);
+    };
 
-    setProducts(mappedProducts);
-    setLoading(false);
+    fetchDevices();
   }, []);
 
   useEffect(() => {

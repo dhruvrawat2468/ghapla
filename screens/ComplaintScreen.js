@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   View,
   Text,
@@ -9,31 +9,60 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import axios from "axios";
+import { AuthContext } from "../context/AuthContext";
 
 const ComplaintScreen = () => {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { userToken } = useContext(AuthContext);
   const [complaintType, setComplaintType] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  // Get repairItem from navigation params
+  const repairItem = route.params?.repairItem;
+
+  const handleSubmit = async () => {
     if (!complaintType || !title || !description) {
       Alert.alert("Error", "Please fill all required fields");
       return;
     }
 
+    if (!repairItem?.id) {
+      Alert.alert("Error", "No order selected for the complaint.");
+      return;
+    }
+
+    if (!userToken) {
+      Alert.alert("Error", "You must be logged in to submit a complaint.");
+      return;
+    }
+
     setIsSubmitting(true);
 
-    console.log({
-      complaintType,
-      title,
-      description,
-    });
+    try {
+      const complaintData = {
+        orderId: repairItem.id,
+        complaintType,
+        description,
+        name: repairItem.name,
+      };
+      console.log("Submitting complaint:", complaintData);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
+      const response = await axios.post(
+        "http://192.168.1.8:7000/api/complaints",
+        complaintData,
+        {
+          headers: { Authorization: `Bearer ${userToken}`, "Content-Type": "application/json" },
+        }
+      );
+
       Alert.alert(
         "Complaint Submitted",
         "Your complaint has been registered successfully. We'll get back to you soon.",
@@ -44,11 +73,20 @@ const ComplaintScreen = () => {
               setComplaintType("");
               setTitle("");
               setDescription("");
+              navigation.goBack();
             },
           },
         ]
       );
-    }, 1500);
+    } catch (error) {
+      console.error("Error submitting complaint:", error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.message || "Failed to submit complaint. Please try again."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -66,6 +104,19 @@ const ComplaintScreen = () => {
             We're here to help resolve your issues
           </Text>
         </View>
+
+        {/* Order Details */}
+        {repairItem ? (
+          <View style={styles.orderContainer}>
+            <Image source={repairItem.image} style={styles.itemImage} />
+            <View style={styles.textContainer}>
+              <Text style={styles.itemName}>{repairItem.name}</Text>
+              <Text style={styles.itemDate}>📅 {repairItem.date}</Text>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.noOrderText}>No order selected.</Text>
+        )}
 
         {/* Complaint type selection */}
         <Text style={styles.label}>COMPLAINT TYPE*</Text>
@@ -123,6 +174,7 @@ const ComplaintScreen = () => {
             onChangeText={setDescription}
             multiline
             numberOfLines={5}
+            textAlignVertical="top"
           />
         </View>
 
@@ -167,6 +219,44 @@ const styles = StyleSheet.create({
   subHeader: {
     fontSize: 16,
     color: "#666",
+  },
+  orderContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF3E0",
+    padding: 15,
+    borderRadius: 15,
+    marginBottom: 20,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
+  itemImage: {
+    width: 55,
+    height: 55,
+    marginRight: 15,
+    borderRadius: 10,
+  },
+  textContainer: {
+    flex: 1,
+  },
+  itemName: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 4,
+  },
+  itemDate: {
+    fontSize: 14,
+    color: "#666",
+  },
+  noOrderText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 20,
   },
   label: {
     fontSize: 14,

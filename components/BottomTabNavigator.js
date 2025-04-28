@@ -48,16 +48,8 @@ const BottomTabNavigator = ({ navigation }) => {
       </TouchableOpacity>
 
       {/* Login Button (assuming this was meant to be different from History) */}
-      <TouchableOpacity
-        onPress={() => navigation.navigate("OtpLogin")}
-        style={styles.tabButton}
-      >
-        <Ionicons
-          name="log-in-outline" // Changed icon to better represent login
-          size={24}
-          color={isActive("LoginA") ? "#fd7e14" : "black"}
-        />
-      </TouchableOpacity>
+      
+    
     </View>
   );
 };

@@ -12,102 +12,19 @@ import {
   Platform,
   KeyboardAvoidingView,
   SafeAreaView,
-  FlatList,
+  Alert,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import Slider from "@react-native-community/slider";
-
-const pricingData = {
-  "Mobile Phone/Tablet": [
-    { repairType: "Screen Replacement", price: "₹1,199" },
-    { repairType: "Battery Replacement", price: "₹799" },
-    { repairType: "Charging Port Repair", price: "₹499" },
-    { repairType: "Speaker/Mic Repair", price: "₹399" },
-    { repairType: "Back Panel Replacement", price: "₹699" },
-    { repairType: "Camera Repair", price: "₹899" },
-    { repairType: "Water Damage Diagnosis", price: "Free" },
-    { repairType: "Software Issue/Firmware", price: "₹399" },
-    { repairType: "Tempered Glass", price: "₹49" },
-  ],
-  Laptop: [
-    { repairType: "Screen Replacement", price: "₹2,499" },
-    { repairType: "Battery Replacement", price: "₹1,199" },
-    { repairType: "Keyboard Replacement", price: "₹999" },
-    { repairType: "SSD Upgrade", price: "₹1,499" },
-    { repairType: "RAM Upgrade", price: "₹999" },
-    { repairType: "OS Installation/Formatting", price: "₹499" },
-    { repairType: "Hinge Repair", price: "₹799" },
-    { repairType: "Motherboard Repair", price: "₹2,499" },
-    { repairType: "Adapter/Charger Issue", price: "₹399" },
-  ],
-  "Washing Machine": [
-    { repairType: "Drainage Issue", price: "₹499" },
-    { repairType: "Door Lock Repair", price: "₹599" },
-    { repairType: "Motor Repair/Replacement", price: "₹1,799" },
-    { repairType: "PCB (Control Board) Repair", price: "₹1,199" },
-    { repairType: "Water Inlet Valve Replacement", price: "₹499" },
-    { repairType: "General Service & Checkup", price: "₹299" },
-  ],
-  Refrigerators: [
-    { repairType: "Gas Refilling", price: "₹1,199" },
-    { repairType: "Compressor Repair", price: "₹1,999" },
-    { repairType: "Thermostat Replacement", price: "₹599" },
-    { repairType: "Door Gasket Replacement", price: "₹399" },
-    { repairType: "Light/Power Issues", price: "₹499" },
-    { repairType: "Cooling Coil Cleaning", price: "₹499" },
-  ],
-  AC: [
-    { repairType: "Gas Charging", price: "₹1,799" },
-    { repairType: "PCB Repair", price: "₹1,199" },
-    { repairType: "Capacitor Replacement", price: "₹499" },
-    { repairType: "Fan/Motor Repair", price: "₹799" },
-    { repairType: "General Service", price: "₹399" },
-    { repairType: "Installation/Uninstallation", price: "₹699" },
-  ],
-  Television: [
-    { repairType: "Display Panel Replacement", price: "₹2,999" },
-    { repairType: "Power Supply Board Repair", price: "₹999" },
-    { repairType: "HDMI/AV Port Issues", price: "₹599" },
-    { repairType: "Sound Issue Repair", price: "₹799" },
-    { repairType: "Remote Sensor Repair", price: "₹499" },
-    { repairType: "Wall Mounting", price: "₹399" },
-  ],
-  Geyser: [
-    { repairType: "Heating Element Replacement", price: "₹599" },
-    { repairType: "Thermostat Replacement", price: "₹399" },
-    { repairType: "Water Leakage Fix", price: "₹499" },
-    { repairType: "Power/Indicator Issue", price: "₹299" },
-  ],
-  "Microwave Ovens": [
-    { repairType: "Magnetron Replacement", price: "₹1,199" },
-    { repairType: "PCB Board Repair", price: "₹799" },
-    { repairType: "Touch Panel Repair", price: "₹999" },
-    { repairType: "Door Lock Issue", price: "₹499" },
-    { repairType: "Fuse/Light Repair", price: "₹299" },
-  ],
-  "Water Purifiers (RO/UV)": [
-    { repairType: "RO Membrane Replacement", price: "₹599" },
-    { repairType: "Filter Replacement (Full)", price: "₹799" },
-    { repairType: "Motor Pump Issue", price: "₹499" },
-    { repairType: "Leakage Fix", price: "₹399" },
-    { repairType: "Annual Maintenance Kit", price: "₹1,199" },
-  ],
-};
 
 export default function ProductDetailsScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const {
-    productName,
-    categories: passedCategories,
-    searchQuery,
-  } = route.params || {};
-  const deviceName =
-    searchQuery?.trim() || productName?.trim() || "Unknown Device";
+  const { productName, categories: passedCategories, searchQuery } = route.params || {};
+  const deviceName = searchQuery?.trim() || productName?.trim() || "Unknown Device";
   const [brandName, setBrandName] = useState("");
   const [issueDescription, setIssueDescription] = useState("");
   const [date, setDate] = useState(new Date());
@@ -118,7 +35,6 @@ export default function ProductDetailsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [deviceCategories, setDeviceCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isPricingVisible, setIsPricingVisible] = useState(true);
 
   useEffect(() => {
     const fetchDeviceCategories = async () => {
@@ -127,9 +43,7 @@ export default function ProductDetailsScreen() {
         setLoading(false);
       } else {
         try {
-          const response = await fetch(
-            "http://192.168.1.8:7000/api/devices/all"
-          );
+          const response = await fetch("http://192.168.1.8:7000/api/devices/all");
           if (!response.ok) throw new Error("Failed to fetch devices");
           const devices = await response.json();
           const matchingDevices = devices.filter(
@@ -157,16 +71,34 @@ export default function ProductDetailsScreen() {
 
   const pickImage = async () => {
     if (images.length >= 2) {
-      alert("You can only upload up to two images.");
+      Alert.alert("Limit Reached", "You can only upload up to two images.");
       return;
     }
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "image",
-      allowsEditing: false,
-      aspect: [4, 3],
-      quality: 1,
-    });
-    if (!result.canceled) setImages([...images, result.assets[0].uri]);
+
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "Sorry, we need gallery permissions to select images. Please enable them in your device settings."
+        );
+        return;
+      }
+
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        aspect: [4, 3],
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImages([...images, result.assets[0].uri]);
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("Error", "Failed to pick image. Please try again.");
+    }
   };
 
   const removeImage = (index) => {
@@ -183,65 +115,47 @@ export default function ProductDetailsScreen() {
     setSelectedImage(null);
   };
 
-  const uploadImagesToBackend = async () => {
+  const uploadImagesToBackend = async (
+    image,
+    deviceName,
+    deviceCategories,
+    brandName,
+    issueDescription,
+    date,
+    selectedTimeSlot,
+    navigation
+  ) => {
     try {
-      const formData = new FormData();
-      images.forEach((uri, index) => {
-        const filename = uri.split("/").pop();
+      let imageId = null;
+
+      if (image && typeof image === "string") {
+        const formData = new FormData();
+        const filename = image.split("/").pop();
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : "image/jpeg";
-        formData.append("file", { uri, name: filename, type });
-      });
-      formData.append("deviceName", deviceName);
-      formData.append("brandName", brandName);
-      formData.append("issueDescription", issueDescription);
-      formData.append("date", date.toISOString());
-      formData.append("timeSlot", selectedTimeSlot || "");
+        formData.append("file", { uri: image, name: filename, type });
 
-      const response = await fetch("http://192.168.1.8:7000/api/image/upload", {
-        method: "POST",
-        body: formData,
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+        const response = await fetch("http://192.168.1.8:7000/api/image/upload", {
+          method: "POST",
+          body: formData,
+        });
 
-      if (!response.ok) throw new Error("Failed to upload images");
-      const result = await response.json();
-      console.log("Upload response:", result);
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || "Failed to upload image");
+        }
 
-      navigation.navigate("Carousel", {
-        deviceName,
-        categories: deviceCategories,
-        brandName,
-        issueDescription,
-        date: date.toISOString(),
-        timeSlot: selectedTimeSlot,
-        images: [result.image._id],
-      });
+        imageId = result.image ? result.image._id : null;
+        console.log("Upload response:", result);
+      }
+
+      return imageId;
     } catch (error) {
-      console.error("Error uploading images:", error);
-      alert("Failed to upload images. Please try again.");
+      console.error("Image upload error:", error);
+      Alert.alert("Upload Failed", error.message || "Failed to process request. Please try again.");
+      throw error;
     }
   };
-
-  const getProductCategory = () => {
-    const categories = Object.keys(pricingData);
-    const matchedCategory = categories.find((category) =>
-      deviceCategories.some((deviceCategory) =>
-        category.toLowerCase().includes(deviceCategory.toLowerCase())
-      )
-    );
-    return matchedCategory || deviceName;
-  };
-
-  const productCategory = getProductCategory();
-  const prices = pricingData[productCategory] || [];
-
-  const renderPriceItem = ({ item }) => (
-    <View style={styles.priceRow}>
-      <Text style={styles.repairType}>{item.repairType}</Text>
-      <Text style={styles.price}>{item.price}</Text>
-    </View>
-  );
 
   if (loading) {
     return (
@@ -273,48 +187,6 @@ export default function ProductDetailsScreen() {
               </View>
             )}
           </View>
-
-          {prices.length > 0 && (
-            <View style={styles.card}>
-              <View style={styles.section}>
-                <TouchableOpacity
-                  style={styles.dropdownHeader}
-                  onPress={() => setIsPricingVisible(!isPricingVisible)}
-                  accessibilityLabel={
-                    isPricingVisible
-                      ? "Collapse pricing information"
-                      : "Expand pricing information"
-                  }
-                >
-                  <Text style={styles.sectionTitle}>Pricing Information</Text>
-                  <Ionicons
-                    name={isPricingVisible ? "chevron-up" : "chevron-down"}
-                    size={20}
-                    color="#2d3436"
-                  />
-                </TouchableOpacity>
-                {isPricingVisible && (
-                  <View style={styles.pricingContainer}>
-                    <View style={styles.priceRow}>
-                      <Text style={styles.pricingHeader}>Services</Text>
-                      <Text style={styles.startingFromRight}>
-                        Starting from
-                      </Text>
-                    </View>
-                    <FlatList
-                      data={prices}
-                      renderItem={renderPriceItem}
-                      keyExtractor={(item, index) =>
-                        `${item.repairType}-${index}`
-                      }
-                      showsVerticalScrollIndicator={false}
-                      nestedScrollEnabled={true}
-                    />
-                  </View>
-                )}
-              </View>
-            </View>
-          )}
 
           <View style={styles.card}>
             <View style={styles.section}>
@@ -447,7 +319,37 @@ export default function ProductDetailsScreen() {
 
             <TouchableOpacity
               style={styles.submitButton}
-              onPress={uploadImagesToBackend}
+              onPress={async () => {
+                try {
+                  const imageIds = [];
+                  for (const image of images) {
+                    const imageId = await uploadImagesToBackend(
+                      image,
+                      deviceName,
+                      deviceCategories,
+                      brandName,
+                      issueDescription,
+                      date,
+                      selectedTimeSlot,
+                      navigation
+                    );
+                    if (imageId) {
+                      imageIds.push(imageId);
+                    }
+                  }
+                  navigation.navigate("Carousel", {
+                    deviceName,
+                    categories: deviceCategories,
+                    brandName,
+                    issueDescription,
+                    date: date.toISOString(),
+                    timeSlot: selectedTimeSlot || "",
+                    images: imageIds,
+                  });
+                } catch (error) {
+                  console.error("Failed to upload images:", error);
+                }
+              }}
             >
               <LinearGradient
                 colors={["#fd7e14", "#ffa502"]}
@@ -455,7 +357,7 @@ export default function ProductDetailsScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Text style={styles.submitText}>SUBMIT REQUEST</Text>
+                <Text style={styles.submitText}>NEXT</Text>
                 <Ionicons
                   name="arrow-forward"
                   size={20}
@@ -522,21 +424,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     paddingVertical: 2,
   },
-  pricingHeader: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2d3436",
-    marginBottom: 8,
-    paddingBottom: 4,
-  },
-  startingFromRight: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2d3436",
-    flex: 1,
-    textAlign: "right",
-    paddingRight: 8,
-  },
   serviceTypeBadge: {
     backgroundColor: "#fd7e14",
     paddingHorizontal: 12,
@@ -566,11 +453,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#2d3436",
     marginBottom: 16,
-  },
-  dropdownHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
   },
   inputContainer: { marginBottom: 16 },
   inputLabel: {
@@ -724,32 +606,5 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 18,
     color: "#565656",
-  },
-  pricingContainer: {
-    backgroundColor: "#f8f9fa",
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#dfe6e9",
-    maxHeight: 200,
-  },
-  priceRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#dfe6e9",
-  },
-  repairType: {
-    fontSize: 14,
-    color: "#2d3436",
-    flex: 2,
-  },
-  price: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#fd7e14",
-    flex: 1,
-    textAlign: "right",
   },
 });

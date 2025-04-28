@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
+  Alert,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import {
@@ -26,7 +27,9 @@ import * as Location from "expo-location";
 import Geocoder from "react-native-geocoding";
 import MapView, { Marker } from "react-native-maps";
 import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
-const { width: SCREEN_WIDTH } = Dimensions.get("window"); // Get screen width
+import { AuthContext } from "../context/AuthContext";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 Geocoder.init("AIzaSyBzhTtWJn8_cjGyTd8FdI5M0d29_pD9yn8");
 
@@ -41,6 +44,7 @@ const timeSlotMapping = {
 const CarouselScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
+  const { userProfile } = useContext(AuthContext);
   const { deviceName, categories = [], brandName, date, timeSlot, images } = route.params || {};
   const { from: serviceFromTime, to: serviceToTime } = timeSlotMapping[timeSlot] || { from: null, to: null };
 
@@ -113,7 +117,7 @@ const CarouselScreen = () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         setLoadingGPS(false);
-        alert("Location permission denied.");
+        Alert.alert("Location permission denied.");
         return;
       }
 
@@ -149,7 +153,7 @@ const CarouselScreen = () => {
       setPincode(postalCode);
     } catch (error) {
       console.error("Location or Geocoding error:", error);
-      alert("Failed to get location. Please try again or enter manually.");
+      Alert.alert("Failed to get location. Please try again or enter manually.");
     }
     setLoadingGPS(false);
   };
@@ -167,34 +171,46 @@ const CarouselScreen = () => {
   };
 
   const handleSubmit = async () => {
+    if (!userProfile || !userProfile._id) {
+      Alert.alert("Authentication Required", "Please log in to place an order.");
+      navigation.navigate("Login");
+      return;
+    }
+
     if (!address || !pincode) {
-      alert("Please enter your address and pincode");
+      Alert.alert("Please enter your address and pincode");
       return;
     }
     if (categories.length > 1 && !selectedMode) {
-      alert("Please select a service mode");
+      Alert.alert("Please select a service mode");
       return;
     }
-  
+    if (!timeSlot || !timeSlotMapping[timeSlot]) {
+      Alert.alert("Please select a valid time slot");
+      return;
+    }
+
+    // Normalize serviceDate to YYYY-MM-DD format
+    const serviceDate = new Date(date).toISOString().split("T")[0];
+
     const orderData = {
-      userId: "67bb2b12f376ae0eae5fa32a",
+      userId: userProfile._id,
       applianceName: deviceName,
       type: selectedMode || (categories.length === 1 ? categories[0] : null),
       brandName: brandName,
-      serviceDate: date,
+      serviceDate,
       serviceFromTime,
       serviceToTime,
-      technicianId: "tech123",
       imageId: images && images.length > 0 ? images[0] : null,
       address: {
         street: address,
-        landmark: landmark,
-        pincode: pincode,
+        landmark: landmark || "",
+        pincode,
       },
     };
-  
+
     console.log("Order Data:", orderData);
-  
+
     const missingFields = [];
     if (!orderData.applianceName) missingFields.push("Appliance Name");
     if (!orderData.type) missingFields.push("Service Type");
@@ -202,46 +218,44 @@ const CarouselScreen = () => {
     if (!orderData.serviceDate) missingFields.push("Service Date");
     if (!orderData.serviceFromTime) missingFields.push("Service From Time");
     if (!orderData.serviceToTime) missingFields.push("Service To Time");
-    if (!orderData.technicianId) missingFields.push("Technician ID");
-  
+    if (!orderData.address.street) missingFields.push("Address");
+    if (!orderData.address.pincode) missingFields.push("Pincode");
+
     if (missingFields.length > 0) {
-      alert(`Please provide: ${missingFields.join(", ")}`);
+      Alert.alert(`Please provide: ${missingFields.join(", ")}`);
       return;
     }
-  
+
     try {
       const response = await fetch("http://192.168.1.8:7000/api/orders/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderData),
       });
-  
+
       const result = await response.json();
       if (response.ok) {
-        alert("Order placed successfully!");
-  
-        // Determine the service type for navigation
+        Alert.alert("Order placed successfully!");
+
         const serviceType = categories.length === 1 ? categories[0] : selectedMode;
-  
-        // Navigate based on service type
+
         if (serviceType === "Pickup Repair Drop") {
           navigation.navigate("PickupRepair", { orderId: result.order._id, ...orderData });
-        } else if (serviceType === "Repair at Home") {
+        } else if (serviceType === "Home Repair") {
           navigation.navigate("HomeRepair", { orderId: result.order._id, ...orderData });
         } else {
-          // Fallback navigation if service type doesn't match expected values
           navigation.navigate("Tracking", { orderId: result.order._id, ...orderData });
         }
-        alert("order placed successfully");
       } else {
         console.error("Error response:", result);
-        alert(`Failed to place order: ${result.message}`);
+        Alert.alert(`Failed to place order: ${result.message}`);
       }
     } catch (error) {
       console.error("Order API Error:", error);
-      alert("Something went wrong. Please try again later.");
+      Alert.alert("Something went wrong. Please try again later.");
     }
   };
+
   if (!fontsLoaded) {
     return null;
   }
@@ -409,10 +423,10 @@ const styles = StyleSheet.create({
   },
   categoryButtonsWrapper: {
     flexDirection: "row",
-    flexWrap: "wrap", // Allow wrapping if needed
+    flexWrap: "wrap",
     gap: 12,
     marginLeft: 10,
-    justifyContent: "center", // Center buttons
+    justifyContent: "center",
   },
   categoryButton: {
     backgroundColor: "#FFE0B2",
@@ -421,8 +435,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "#FF6D00",
-    width: (SCREEN_WIDTH - 64) / 2, // Adjust width dynamically (20 padding + 24 form padding + 10 margin + 10 gap)
-    alignItems: "center", // Center text
+    width: (SCREEN_WIDTH - 64) / 2,
+    alignItems: "center",
   },
   categoryButtonSelected: {
     backgroundColor: "#FF6D00",
@@ -432,14 +446,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 13,
     fontFamily: "Oswald_400Regular",
-    textAlign: "center", // Center text
-    numberOfLines: 1, // Truncate if too long
+    textAlign: "center",
+    numberOfLines: 1,
     ellipsizeMode: "tail",
   },
   categoryButtonTextSelected: {
     color: "#FFFFFF",
   },
-  // ... other styles remain unch
   formContainer: {
     width: "100%",
     backgroundColor: "#FFFFFF",

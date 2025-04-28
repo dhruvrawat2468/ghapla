@@ -95,7 +95,7 @@ const Services = () => {
                   style={styles.serviceCard}
                   onPress={() =>
                     navigation.navigate("ProductList", {
-                      category: service.category,
+                      category: "Pickup Repair Drop",
                     })
                   }
                   activeOpacity={0.8}
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: "center",
     justifyContent: "center",
-    height: CARD_WIDTH * 1.2,
+    height: CARD_WIDTH * 1.3,
   },
   iconContainer: {
     backgroundColor: "rgba(255, 255, 255, 0.7)",
@@ -214,4 +214,3 @@ const styles = StyleSheet.create({
 
 export default Services;
 
-// ... rest of your component remains the same ...

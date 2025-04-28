@@ -1,58 +1,109 @@
-import React from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   Text,
   FlatList,
-  Image,
   StyleSheet,
   TouchableOpacity,
-  StatusBar,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-
-const orders = [
-  {
-    id: "1",
-    name: "Kettle Repair",
-    date: "Today, 10:30 AM",
-    price: "₹230",
-    image: require("../assets/images/i3.png"),
-    status: "ongoing",
-    eta: "2 hours remaining",
-  },
-  {
-    id: "2",
-    name: "Phone Screen Replacement",
-    date: "Yesterday, 2:15 PM",
-    price: "₹400",
-    image: require("../assets/images/i2.png"),
-    status: "completed",
-  },
-  {
-    id: "3",
-    name: "Mixer Grinder Service",
-    date: "Dec 23, 11:00 AM",
-    price: "₹150",
-    image: require("../assets/images/i1.png"),
-    status: "completed",
-  },
-];
+import axios from "axios";
+import { AuthContext } from "../context/AuthContext";
 
 const OrderTrackingScreen = () => {
   const navigation = useNavigation();
+  const { userToken, userProfile } = useContext(AuthContext);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch orders and their OrderStatus
+  useEffect(() => {
+    const fetchOrdersAndStatuses = async () => {
+      if (!userProfile?._id || !userToken) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch orders
+        const ordersResponse = await axios.get(
+          `http://192.168.1.8:7000/api/orders/user/${userProfile._id}`,
+          {
+            headers: { Authorization: `Bearer ${userToken}` },
+          }
+        );
+
+        // Fetch OrderStatus for each order
+        const statusPromises = ordersResponse.data.map((order) =>
+          axios
+            .get(
+              `http://192.168.1.8:7000/api/orders/order-status/${order._id}`,
+              {
+                headers: { Authorization: `Bearer ${userToken}` },
+              }
+            )
+            .catch((error) => {
+              if (error.response?.status === 404) {
+                console.warn(`OrderStatus not found for orderId: ${order._id}`);
+                return { data: null };
+              }
+              throw error;
+            })
+        );
+
+        const statusesResponses = await Promise.all(statusPromises);
+
+        // Create a status map
+        const statusMap = {};
+        statusesResponses.forEach((response, index) => {
+          const orderId = ordersResponse.data[index]._id;
+          statusMap[orderId] = response.data?.status || "unknown";
+        });
+
+        // Map orders with their OrderStatus.status and serviceType
+        const mappedOrders = ordersResponse.data.map((order) => ({
+          id: order._id,
+          name: order.applianceName,
+          date: new Date(order.serviceDate).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "2-digit",
+          }).replace(/\//g, "-"),
+          status: statusMap[order._id],
+          serviceType: order.serviceType,
+        }));
+
+        setOrders(mappedOrders);
+      } catch (error) {
+        console.error("Error fetching orders or statuses:", {
+          message: error.message,
+          response: error.response?.data,
+        });
+        Alert.alert("Error", "Failed to load orders. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrdersAndStatuses();
+  }, [userProfile, userToken]);
 
   const handleTrackOrder = (item) => {
-    navigation.navigate("CurrentOrder", { order: item });
+    navigation.navigate(
+      item.serviceType === "Pickup Repair Drop" ? "PickupRepair" : "HomeRepair",
+      { orderId: item.id }
+    );
   };
 
   const handleReview = (item) => {
-    navigation.navigate("ReviewScreen", { order: item });
+    navigation.navigate("ReviewScreen", { repairItem: item });
   };
 
   const handleComplaint = (item) => {
-    navigation.navigate("ComplaintScreen", { order: item });
+    navigation.navigate("ComplaintScreen", { repairItem: item });
   };
 
   const renderOrderItem = ({ item }) => (
@@ -62,15 +113,9 @@ const OrderTrackingScreen = () => {
         onPress={() => handleTrackOrder(item)}
         activeOpacity={0.9}
       >
-        <View style={styles.itemImageContainer}>
-          <Image source={item.image} style={styles.itemImage} />
-          {item.status === "ongoing" && <View style={styles.liveBadge} />}
-        </View>
-
         <View style={styles.itemDetails}>
           <View style={styles.topRow}>
             <Text style={styles.itemName}>{item.name}</Text>
-            <Text style={styles.itemPrice}>{item.price}</Text>
           </View>
 
           <View style={styles.dateRow}>
@@ -78,13 +123,12 @@ const OrderTrackingScreen = () => {
             <Text style={styles.itemDate}>{item.date}</Text>
           </View>
 
-          {item.status === "ongoing" ? (
+          {item.status !== "completed" ? (
             <View style={styles.statusRow}>
               <View style={styles.statusPill}>
                 <View style={[styles.statusDot, styles.ongoingDot]} />
                 <Text style={styles.statusText}>In Progress</Text>
               </View>
-              <Text style={styles.etaText}>{item.eta}</Text>
             </View>
           ) : (
             <View style={styles.statusRow}>
@@ -126,10 +170,35 @@ const OrderTrackingScreen = () => {
     </View>
   );
 
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FD7E14" />
+          <Text style={styles.loadingText}>Loading Orders...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!userProfile || !userToken) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.noUserText}>
+            Please log in to view your repair history.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Filter orders based on OrderStatus.status
+  const currentOrders = orders.filter((order) => order.status !== "completed");
+  const pastRepairs = orders.filter((order) => order.status === "completed");
+
   return (
     <View style={styles.container}>
-      {/* <StatusBar backgroundColor="#FD7E14" barStyle="light-content" /> */}
-
       {/* Stats Cards */}
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
@@ -137,24 +206,24 @@ const OrderTrackingScreen = () => {
           <Text style={styles.statLabel}>Total Orders</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>
-            {orders.filter((o) => o.status === "completed").length}
-          </Text>
+          <Text style={styles.statNumber}>{pastRepairs.length}</Text>
           <Text style={styles.statLabel}>Completed</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>
-            {orders.filter((o) => o.status === "ongoing").length}
-          </Text>
+          <Text style={styles.statNumber}>{currentOrders.length}</Text>
           <Text style={styles.statLabel}>In Progress</Text>
         </View>
       </View>
+
       {/* Order List */}
       <FlatList
         data={orders}
         keyExtractor={(item) => item.id}
         renderItem={renderOrderItem}
         contentContainerStyle={styles.listContainer}
+        ListEmptyComponent={
+          <Text style={styles.noOrderText}>No orders found.</Text>
+        }
       />
     </View>
   );
@@ -164,21 +233,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8F9FA",
-  },
-  header: {
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 25,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  headerContent: {
-    height: 40, // Maintain header space without title
   },
   statsContainer: {
     flexDirection: "row",
@@ -230,26 +284,6 @@ const styles = StyleSheet.create({
     padding: 15,
     alignItems: "center",
   },
-  itemImageContainer: {
-    position: "relative",
-    marginRight: 15,
-  },
-  itemImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
-  },
-  liveBadge: {
-    position: "absolute",
-    top: -5,
-    right: -5,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: "#4CAF50",
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
   itemDetails: {
     flex: 1,
   },
@@ -264,11 +298,6 @@ const styles = StyleSheet.create({
     color: "#333",
     flex: 1,
     marginRight: 10,
-  },
-  itemPrice: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#FD7E14",
   },
   dateRow: {
     flexDirection: "row",
@@ -310,11 +339,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#555",
   },
-  etaText: {
-    fontSize: 12,
-    color: "#FD7E14",
-    fontWeight: "500",
-  },
   actionButtons: {
     flexDirection: "row",
     borderTopWidth: 1,
@@ -349,6 +373,29 @@ const styles = StyleSheet.create({
   },
   arrowIcon: {
     marginLeft: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#666",
+    marginTop: 10,
+  },
+  noOrderText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginHorizontal: 20,
+    marginTop: 10,
+  },
+  noUserText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginHorizontal: 20,
   },
 });
 

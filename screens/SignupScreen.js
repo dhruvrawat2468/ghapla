@@ -209,45 +209,7 @@ export default function SignupScreen() {
             </View>
           </View>
 
-          {/* Account Security Section
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>
-              <MaterialIcons name="security" size={18} color="#565656" />{" "}
-              Account Security
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <Feather
-                name="lock"
-                size={20}
-                color="#fd7e14"
-                style={styles.icon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Password* (min 6 characters)"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <MaterialIcons
-                name="lock-outline"
-                size={20}
-                color="#fd7e14"
-                style={styles.icon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Confirm Password*"
-                secureTextEntry
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-              /> 
-            </View>
-          </View> */}
+         
 
           <TouchableOpacity style={styles.button} onPress={handleSignup}>
             <MaterialIcons name="how-to-reg" size={20} color="#fff" />
