@@ -6,18 +6,20 @@ import {
   ScrollView,
   TouchableOpacity,
   Animated,
+  Modal,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Card, RadioButton } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
 
-const TrackingStatusScreen = ({navigation}) => {
-  const [status, setStatus] = useState("picked");
+const TrackingStatusScreen = ({ route }) => {
+  const { orderId } = route.params || {};
+  const [status, setStatus] = useState(null); // Null until user-facing status
   const [paymentMethod, setPaymentMethod] = useState(null);
-  const statuses = ["Arrived", "verification", "repair", "payment"];
-  const indexRef = useRef(0);
-
-  // Animated Values for each segment of the line (3 segments for 4 steps)
+  const [isCostModalVisible, setCostModalVisible] = useState(false);
+  const [orderDetails, setOrderDetails] = useState(null);
+  const statuses = ["Arrived", "Cost Verification", "Repair in Progress", "Ready to Deliver"];
   const animatedLines = useRef(
     Array(statuses.length - 1)
       .fill()
@@ -25,42 +27,142 @@ const TrackingStatusScreen = ({navigation}) => {
   ).current;
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      if (indexRef.current < statuses.length - 1) {
-        indexRef.current++;
-        setStatus(statuses[indexRef.current]);
+    const fetchOrderDetails = async () => {
+      try {
+        const response = await fetch(`http://192.168.251.1:7000/api/orders/order-status/${orderId}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (!response.ok) {
+          throw new Error("Order status not found");
+        }
+        const data = await response.json();
+        if (data) {
+          setOrderDetails(data);
+          const currentStatus = data.status;
+          if (statuses.includes(currentStatus)) {
+            setStatus(currentStatus);
+            const currentIndex = statuses.indexOf(currentStatus);
+            animatedLines.forEach((animValue, index) => {
+              Animated.timing(animValue, {
+                toValue: index < currentIndex ? 1 : 0,
+                duration: 1000,
+                useNativeDriver: false,
+              }).start();
+            });
+            if (currentStatus === "Cost Verification" && data.cost > 0) {
+              setCostModalVisible(true);
+            }
+          } else {
+            setStatus(null);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching order status:", error);
+        setStatus(null);
+      }
+    };
 
-        Animated.timing(animatedLines[indexRef.current - 1], {
+    if (orderId) {
+      fetchOrderDetails();
+      const interval = setInterval(fetchOrderDetails, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [orderId]);
+
+  const handleAcceptCost = async () => {
+    try {
+      const response = await fetch(`http://192.168.251.1:7000/api/orders/order-status/accept-cost`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      });
+      if (response.ok) {
+        const updatedStatus = await response.json();
+        setOrderDetails(updatedStatus.orderStatus);
+        setStatus("Repair in Progress");
+        setCostModalVisible(false);
+        const currentIndex = statuses.indexOf("Cost Verification");
+        Animated.timing(animatedLines[currentIndex], {
           toValue: 1,
           duration: 1000,
           useNativeDriver: false,
         }).start();
-      } else {
-        clearInterval(timer);
       }
-    }, 3000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  const handlePayment = () => {
-    alert(`Payment method selected: ${paymentMethod}`);
+    } catch (error) {
+      console.error("Error accepting cost:", error);
+    }
   };
 
+  const handleRejectCost = async () => {
+    try {
+      const response = await fetch(`http://192.168.251.1:7000/api/orders/order-status/reject-cost`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      });
+      if (response.ok) {
+        const updatedStatus = await response.json();
+        setOrderDetails(updatedStatus.orderStatus);
+        setStatus("Arrived");
+        setCostModalVisible(false);
+      }
+    } catch (error) {
+      console.error("Error rejecting cost:", error);
+    }
+  };
+
+  const handlePayment = async () => {
+    if (!paymentMethod) return;
+    try {
+      const response = await fetch(`http://192.168.251.1:7000/api/orders/order-status/update`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          status: "Ready to Deliver",
+          paymentStatus: "completed",
+        }),
+      });
+      if (response.ok) {
+        const updatedStatus = await response.json();
+        setOrderDetails(updatedStatus.orderStatus);
+        setStatus("Ready to Deliver");
+        alert(`Payment method selected: ${paymentMethod}`);
+        const currentIndex = statuses.indexOf("Repair in Progress");
+        Animated.timing(animatedLines[currentIndex], {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: false,
+        }).start();
+      }
+    } catch (error) {
+      console.error("Error processing payment:", error);
+    }
+  };
+
+  if (!status) {
+    return (
+      <LinearGradient colors={["#FFB75E", "#ED8F03"]} style={styles.gradientContainer}>
+        <View style={styles.container}>
+          <Card style={styles.cardContainer}>
+            <Text style={styles.heading}>Tracking Status</Text>
+            <View style={styles.divider} />
+            <Text style={styles.waitingText}>Waiting for technician to arrive...</Text>
+          </Card>
+        </View>
+      </LinearGradient>
+    );
+  }
+
   return (
-    <LinearGradient
-      colors={["#FFB75E", "#ED8F03"]}
-      style={styles.gradientContainer}
-    >
+    <LinearGradient colors={["#FFB75E", "#ED8F03"]} style={styles.gradientContainer}>
       <ScrollView contentContainerStyle={styles.container}>
         <Card style={styles.cardContainer}>
           <Text style={styles.heading}>Tracking Status</Text>
           <View style={styles.divider} />
-
           <View style={styles.timeline}>
-            {/* Background line (gray, stops at last icon) */}
             <View style={styles.backgroundLine} />
-            {/* Animated foreground line */}
             <Animated.View style={styles.foregroundLineContainer}>
               {animatedLines.map((animValue, index) => (
                 <Animated.View
@@ -70,28 +172,25 @@ const TrackingStatusScreen = ({navigation}) => {
                     {
                       height: animValue.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [0, 60], // Matches step height + margin
+                        outputRange: [0, 60],
                       }),
                     },
                   ]}
                 />
               ))}
             </Animated.View>
-
-            {statuses.map((step, index) => (
+            {statuses.map((step) => (
               <View key={step} style={styles.step}>
                 <View style={styles.iconContainer}>
                   <MaterialIcons
                     name={
                       step === "Arrived"
                         ? "directions-bike"
-                        : step === "verification"
+                        : step === "Cost Verification"
                         ? "attach-money"
-                        : step === "repair"
+                        : step === "Repair in Progress"
                         ? "build"
-                        : step === "payment"
-                        ? "payment"
-                        : "help-outline"
+                        : "payment"
                     }
                     size={24}
                     color="white"
@@ -101,20 +200,18 @@ const TrackingStatusScreen = ({navigation}) => {
                   <Text style={styles.stepTitle}>
                     {step === "Arrived"
                       ? "Technician Arrived"
-                      : step === "verification"
+                      : step === "Cost Verification"
                       ? "Cost Verification"
-                      : step === "repair"
+                      : step === "Repair in Progress"
                       ? "Repair In Process"
-                      : step === "payment"
-                      ? "Payment Done"
-                      : "Unknown Status"}
+                      : "Payment Done"}
                   </Text>
                   <Text style={styles.stepDescription}>
                     {step === "Arrived"
-                      ? "Technician is at your doorstep, ready to assist you.      "
-                      : step === "verification"
-                      ? "Customer will verify the cost before repairing process."
-                      : step === "repair"
+                      ? "Technician is at your doorstep, ready to assist you."
+                      : step === "Cost Verification"
+                      ? "Please verify the repair cost before we proceed."
+                      : step === "Repair in Progress"
                       ? "Your product is being repaired by experts. Sit back & chill!"
                       : "Payment has been successfully completed."}
                   </Text>
@@ -123,38 +220,29 @@ const TrackingStatusScreen = ({navigation}) => {
             ))}
           </View>
         </Card>
-
-        {/* Bill Details */}
         <Card style={styles.billCard}>
           <Text style={styles.billTitle}>Bill Details</Text>
           <View style={styles.divider} />
           <View style={styles.billItemRow}>
             <Text style={styles.billItem}>Service Charge:</Text>
-            <Text style={styles.billAmount}>₹XXX</Text>
+            <Text style={styles.billAmount}>₹{orderDetails?.serviceCharge || 0}</Text>
           </View>
           <View style={styles.billItemRow}>
             <Text style={styles.billItem}>Repair Cost:</Text>
-            <Text style={styles.billAmount}>₹XXX</Text>
-          </View>
-          <View style={styles.billItemRow}>
-            <Text style={styles.billItem}>Discount:</Text>
-            <Text style={styles.discount}>-₹XXX</Text>
+            <Text style={styles.billAmount}>₹{orderDetails?.cost || 0}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.billItemRow}>
             <Text style={styles.grandTotal}>Grand Total:</Text>
-            <Text style={styles.grandTotalAmount}>₹XXX</Text>
+            <Text style={styles.grandTotalAmount}>
+              ₹{(orderDetails?.serviceCharge || 0) + (orderDetails?.cost || 0)}
+            </Text>
           </View>
         </Card>
-
-        {/* Payment Method */}
         <Card style={styles.paymentCard}>
           <Text style={styles.paymentTitle}>Select Payment Method</Text>
           <View style={styles.divider} />
-          <RadioButton.Group
-            onValueChange={(value) => setPaymentMethod(value)}
-            value={paymentMethod}
-          >
+          <RadioButton.Group onValueChange={(value) => setPaymentMethod(value)} value={paymentMethod}>
             <View style={styles.radioOption}>
               <RadioButton value="COD" />
               <Text style={styles.radioText}>Cash on Delivery (COD)</Text>
@@ -164,18 +252,62 @@ const TrackingStatusScreen = ({navigation}) => {
               <Text style={styles.radioText}>UPI Payment</Text>
             </View>
           </RadioButton.Group>
-
           <TouchableOpacity
             style={[
               styles.paymentButton,
-              !paymentMethod && styles.disabledButton,
+              (!paymentMethod || orderDetails?.status !== "Repair in Progress" || orderDetails?.paymentStatus !== "pending") &&
+                styles.disabledButton,
             ]}
             onPress={handlePayment}
-            disabled={!paymentMethod}
+            disabled={!paymentMethod || orderDetails?.status !== "Repair in Progress" || orderDetails?.paymentStatus !== "pending"}
           >
             <Text style={styles.paymentButtonText}>Proceed to Payment</Text>
           </TouchableOpacity>
         </Card>
+        <Modal
+          visible={isCostModalVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setCostModalVisible(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setCostModalVisible(false)}>
+            <View style={styles.modalBackdrop}>
+              <View style={styles.costModalContainer}>
+                <Text style={styles.modalTitle}>Cost Verification</Text>
+                {orderDetails?.repairDetails?.length > 0 ? (
+                  orderDetails.repairDetails.map((entry, index) => (
+                    <View key={index} style={styles.entryContainer}>
+                      <Text style={styles.modalText}>
+                        {entry.whatRepaired}: ₹{entry.cost}
+                      </Text>
+                      {index < orderDetails.repairDetails.length - 1 && (
+                        <View style={styles.separator} />
+                      )}
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.modalText}>No repair details available</Text>
+                )}
+                <Text style={styles.modalText}>Service Charge: ₹{orderDetails?.serviceCharge || 0}</Text>
+                <Text style={styles.modalText}>Repair Cost: ₹{orderDetails?.cost || 0}</Text>
+                <Text style={styles.modalText}>
+                  Grand Total: ₹{(orderDetails?.serviceCharge || 0) + (orderDetails?.cost || 0)}
+                </Text>
+                <View style={styles.buttonContainer}>
+                  <TouchableOpacity style={styles.modalButton} onPress={handleAcceptCost}>
+                    <Text style={styles.modalButtonText}>Accept</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.rejectButton]}
+                    onPress={handleRejectCost}
+                  >
+                    <Text style={styles.modalButtonText}>Reject</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       </ScrollView>
     </LinearGradient>
   );
@@ -203,6 +335,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: "#585858",
   },
+  waitingText: {
+    fontSize: 18,
+    textAlign: "center",
+    color: "#555555",
+    marginVertical: 20,
+  },
   timeline: {
     marginLeft: 20,
     position: "relative",
@@ -210,7 +348,7 @@ const styles = StyleSheet.create({
   step: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginBottom: 20, // Spacing between steps
+    marginBottom: 20,
   },
   iconContainer: {
     width: 40,
@@ -220,7 +358,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
-    zIndex: 1, // Ensure icons stay above the line
+    zIndex: 1,
   },
   stepContent: {
     flex: 1,
@@ -237,21 +375,21 @@ const styles = StyleSheet.create({
   },
   backgroundLine: {
     position: "absolute",
-    left: 18, // Adjusted slightly to center with wider line
-    top: 20, // Half the icon height to start from center
-    height: 250, // 4 steps: (40 icon height + 20 margin) * 3 gaps + 40 for last icon
-    width: 4, // Increased width for better visibility
-    backgroundColor: "#ccc", // Gray for uncompleted segments
+    left: 18,
+    top: 20,
+    height: 250,
+    width: 4,
+    backgroundColor: "#ccc",
   },
   foregroundLineContainer: {
     position: "absolute",
-    left: 18, // Adjusted slightly to center with wider line
-    top: 20, // Start from center of first icon
+    left: 18,
+    top: 20,
   },
   foregroundLineSegment: {
-    width: 4, // Increased width for better visibility
+    width: 4,
     backgroundColor: "orange",
-    marginBottom: 20, // Match step margin
+    marginBottom: 20,
   },
   billCard: {
     marginTop: 20,
@@ -266,7 +404,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: "#575757",
   },
-  billItemRow: {
+  bill NeItemRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 8,
@@ -279,11 +417,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#565656",
-  },
-  discount: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "red",
   },
   grandTotal: {
     fontSize: 16,
@@ -336,6 +469,78 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: "#ccc",
     marginVertical: 10,
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  costModalContainer: {
+    backgroundColor: "#fff5e6",
+    padding: 25,
+    borderRadius: 20,
+    alignItems: "center",
+    width: "85%",
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    borderColor: "#ff7f00",
+    borderWidth: 2,
+  },
+  modalTitle: {
+    fontSize: 24,
+    marginBottom: 20,
+    textAlign: "center",
+    color: "#000",
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  modalText: {
+    fontSize: 18,
+    marginBottom: 10,
+    textAlign: "center",
+    color: "#333",
+    fontWeight: "500",
+  },
+  entryContainer: {
+    width: "100%",
+    marginBottom: 15,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: "#ff7f00",
+    width: "80%",
+    alignSelf: "center",
+    marginVertical: 10,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
+    marginTop: 15,
+  },
+  modalButton: {
+    backgroundColor: "#ff7f00",
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  rejectButton: {
+    backgroundColor: "#d9534f",
+  },
+  modalButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
   },
 });
 

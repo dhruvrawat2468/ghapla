@@ -1,0 +1,1 @@
+design a dfa in lex code which accepts strings contsining the 3rd last element 'a' over the alphabet 'ab'
