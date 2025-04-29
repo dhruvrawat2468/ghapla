@@ -183,11 +183,6 @@ const TaskScreen = () => {
                 <Text style={styles.infoText}>{item.issue}</Text>
               </View>
 
-              <View style={styles.infoRow}>
-                <MaterialIcons name="location-on" size={18} color="#fd7e14" />
-                <Text style={styles.infoText}>{item.address}</Text>
-              </View>
-
               <View style={styles.bottomRow}>
                 <View style={styles.timeContainer}>
                   <View style={styles.timeBadge}>

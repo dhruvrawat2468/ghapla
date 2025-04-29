@@ -96,9 +96,11 @@ const styles = StyleSheet.create({
     borderBottomColor: "#f0f0f0",
   },
   infoContainer: {
+    marginTop: 10,
     flex: 1,
   },
   greeting: {
+    marginTop: 10,
     fontSize: 18,
     fontWeight: "bold",
     color: "#fd7e14",
@@ -108,6 +110,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   toggleButton: {
+    marginTop: 20,
     width: 90,
     height: 36,
     borderRadius: 18,
@@ -119,6 +122,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   textContainer: {
+    marginTop: 20,
     width: "100%",
     position: "absolute",
     flexDirection: "row",
@@ -147,6 +151,7 @@ const styles = StyleSheet.create({
     left: 0,
   },
   notificationButton: {
+    marginTop: 20,
     position: "relative",
     padding: 5,
   },
