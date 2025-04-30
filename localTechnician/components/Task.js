@@ -71,18 +71,38 @@ const TaskScreen = () => {
   if (technician.overallStatus !== "Verified") {
     return (
       <View style={styles.container}>
-        <View style={styles.pendingVerificationBox}>
+        <View style={styles.statusMessageBox}>
           <MaterialCommunityIcons
             name="alert-outline"
-            size={24}
+            size={32}
             color="#FF9800"
           />
-          <Text style={styles.pendingVerificationText}>
-            Your profile is under verification. You cannot view tasks until your
-            profile is verified by our team.
+          <Text style={styles.statusMessageTitle}>
+            Profile Under Verification
+          </Text>
+          <Text style={styles.statusMessageText}>
+            You cannot view tasks until your profile is verified by our team.
           </Text>
           <Text style={styles.contactSupportText}>
-            For any queries, please contact support.
+            Contact support if you have questions
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Check if technician is online
+  if (!technician.isOnline) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.statusMessageBox}>
+          <MaterialCommunityIcons name="wifi-off" size={32} color="#FF9800" />
+          <Text style={styles.statusMessageTitle}>You're Offline</Text>
+          <Text style={styles.statusMessageText}>
+            Switch to online mode to view and accept tasks
+          </Text>
+          <Text style={styles.contactSupportText}>
+            Use the toggle in the header to go online
           </Text>
         </View>
       </View>
@@ -114,108 +134,120 @@ const TaskScreen = () => {
     return serviceType === "Home Repair" ? "#fd7e14" : "#007bff";
   };
 
-  const getPaymentStatusColor = (status) => {
-    return status === "Paid" ? "#34c759" : "#ff9500";
-  };
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Your Tasks</Text>
+        <Text style={styles.title}>Available Tasks</Text>
         <Text style={styles.subtitle}>
-          {filteredTasks.length} task{filteredTasks.length !== 1 ? "s" : ""}{" "}
-          found
+          {filteredTasks.length} task{filteredTasks.length !== 1 ? "s" : ""}
+          {selectedProducts.length > 0 &&
+            ` for ${selectedProducts.length} selected product${
+              selectedProducts.length !== 1 ? "s" : ""
+            }`}
         </Text>
       </View>
 
-      <FlatList
-        data={filteredTasks}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => navigation.navigate("OrderDetails", { task: item })}
-          >
-            <View style={styles.cardHeader}>
-              <View style={styles.statusContainer}>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    { backgroundColor: getStatusColor(item.status) },
-                  ]}
-                >
-                  <Text style={styles.statusText}>{item.status}</Text>
-                </View>
-                <View
-                  style={[
-                    styles.serviceTypeBadge,
-                    { borderColor: getServiceTypeColor(item.serviceType) },
-                  ]}
-                >
-                  <Text
+      {filteredTasks.length > 0 ? (
+        <FlatList
+          data={filteredTasks}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() =>
+                navigation.navigate("OrderDetails", { task: item })
+              }
+            >
+              <View style={styles.cardHeader}>
+                <View style={styles.statusContainer}>
+                  <View
                     style={[
-                      styles.serviceTypeText,
-                      { color: getServiceTypeColor(item.serviceType) },
+                      styles.statusBadge,
+                      { backgroundColor: getStatusColor(item.status) },
                     ]}
                   >
-                    {item.serviceType}
+                    <Text style={styles.statusText}>{item.status}</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.serviceTypeBadge,
+                      { borderColor: getServiceTypeColor(item.serviceType) },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.serviceTypeText,
+                        { color: getServiceTypeColor(item.serviceType) },
+                      ]}
+                    >
+                      {item.serviceType}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.customerContainer}>
+                  <MaterialIcons name="person" size={20} color="#fd7e14" />
+                  <Text style={styles.customerName}>{item.customer}</Text>
+                </View>
+              </View>
+
+              <View style={styles.cardContent}>
+                <View style={styles.infoRow}>
+                  <MaterialIcons name="devices" size={18} color="#fd7e14" />
+                  <Text style={styles.infoText}>
+                    {item.device} • {item.brand}
                   </Text>
                 </View>
-              </View>
-              <View style={styles.customerContainer}>
-                <MaterialIcons name="person" size={20} color="#fd7e14" />
-                <Text style={styles.customerName}>{item.customer}</Text>
-              </View>
-            </View>
 
-            <View style={styles.cardContent}>
-              <View style={styles.infoRow}>
-                <MaterialIcons name="devices" size={18} color="#fd7e14" />
-                <Text style={styles.infoText}>
-                  {item.device} • {item.brand}
-                </Text>
-              </View>
+                <View style={styles.infoRow}>
+                  <MaterialIcons
+                    name="error-outline"
+                    size={18}
+                    color="#fd7e14"
+                  />
+                  <Text style={styles.infoText}>{item.issue}</Text>
+                </View>
 
-              <View style={styles.infoRow}>
-                <MaterialIcons name="error-outline" size={18} color="#fd7e14" />
-                <Text style={styles.infoText}>{item.issue}</Text>
-              </View>
-
-              <View style={styles.bottomRow}>
-                <View style={styles.timeContainer}>
-                  <View style={styles.timeBadge}>
-                    <MaterialIcons
-                      name="calendar-today"
-                      size={14}
-                      color="#fd7e14"
-                    />
-                    <Text style={styles.timeText}>{item.date}</Text>
-                  </View>
-                  <View style={styles.timeBadge}>
-                    <MaterialIcons
-                      name="access-time"
-                      size={14}
-                      color="#fd7e14"
-                    />
-                    <Text style={styles.timeText}>{item.timeSlot}</Text>
+                <View style={styles.bottomRow}>
+                  <View style={styles.timeContainer}>
+                    <View style={styles.timeBadge}>
+                      <MaterialIcons
+                        name="calendar-today"
+                        size={14}
+                        color="#fd7e14"
+                      />
+                      <Text style={styles.timeText}>{item.date}</Text>
+                    </View>
+                    <View style={styles.timeBadge}>
+                      <MaterialIcons
+                        name="access-time"
+                        size={14}
+                        color="#fd7e14"
+                      />
+                      <Text style={styles.timeText}>{item.timeSlot}</Text>
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <MaterialIcons name="assignment" size={50} color="#fd7e14" />
-            <Text style={styles.emptyText}>No tasks available</Text>
-            <Text style={styles.emptySubtext}>
-              Select different products to see more tasks
-            </Text>
-          </View>
-        }
-      />
+            </TouchableOpacity>
+          )}
+        />
+      ) : (
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons name="tools" size={50} color="#fd7e14" />
+          <Text style={styles.emptyText}>
+            {selectedProducts.length > 0
+              ? "No matching tasks found"
+              : "No tasks available"}
+          </Text>
+          <Text style={styles.emptySubtext}>
+            {selectedProducts.length > 0
+              ? "Try selecting different products"
+              : "Select products you can service to see tasks"}
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -298,7 +330,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   cardContent: {
-    padding: 6,
+    padding: 16,
   },
   infoRow: {
     flexDirection: "row",
@@ -335,15 +367,34 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontWeight: "500",
   },
-  paymentBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
+  statusMessageBox: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: "#FFF3E0",
+    margin: 20,
+    borderRadius: 10,
   },
-  paymentText: {
-    fontSize: 13,
-    color: "#fff",
-    fontWeight: "500",
+  statusMessageTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#FF9800",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  statusMessageText: {
+    fontSize: 16,
+    color: "#FF9800",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  contactSupportText: {
+    fontSize: 14,
+    color: "#FF9800",
+    fontWeight: "bold",
+    textAlign: "center",
+    marginTop: 8,
   },
   emptyContainer: {
     flex: 1,
@@ -362,25 +413,6 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 8,
     textAlign: "center",
-  },
-  pendingVerificationBox: {
-    backgroundColor: "#FFF3E0",
-    padding: 16,
-    borderRadius: 10,
-    margin: 16,
-    flexDirection: "column",
-    alignItems: "flex-start",
-  },
-  pendingVerificationText: {
-    color: "#FF9800",
-    marginTop: 8,
-    marginBottom: 8,
-    fontSize: 16,
-  },
-  contactSupportText: {
-    color: "#FF9800",
-    fontWeight: "bold",
-    fontSize: 14,
   },
 });
 

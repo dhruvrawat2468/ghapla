@@ -21,8 +21,6 @@ export default function SignupScreen() {
   const [mobile, setMobile] = useState("");
   const [address, setAddress] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
 
   // Additional form fields
   const [gender, setGender] = useState("");
@@ -41,8 +39,8 @@ export default function SignupScreen() {
 
   // Validation functions
   const validateInitial = () => {
-    if (!name || !mobile || !address || !password || !confirmPassword) {
-      Alert.alert("Error", "All fields except email are required.");
+    if (!name || !mobile || !address) {
+      Alert.alert("Error", "Name, mobile, and address are required.");
       return false;
     }
     if (mobile.length !== 10 || isNaN(mobile)) {
@@ -51,14 +49,6 @@ export default function SignupScreen() {
     }
     if (email && !/^\S+@\S+\.\S+$/.test(email)) {
       Alert.alert("Error", "Enter a valid email address.");
-      return false;
-    }
-    if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters.");
-      return false;
-    }
-    if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match.");
       return false;
     }
     return true;
@@ -161,7 +151,6 @@ export default function SignupScreen() {
       formData.append("mobile", mobile);
       formData.append("address", address);
       formData.append("email", email);
-      formData.append("password", password);
       formData.append("gender", gender);
       formData.append("age", age);
       formData.append("ifscCode", ifscCode);
@@ -284,8 +273,8 @@ export default function SignupScreen() {
           {/* Account Information Section */}
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
-              <MaterialIcons name="lock-outline" size={24} color="#ff7f00" />
-              <Text style={styles.sectionTitle}>Account Information</Text>
+              <MaterialIcons name="email" size={24} color="#ff7f00" />
+              <Text style={styles.sectionTitle}>Contact Information</Text>
             </View>
 
             <Text style={styles.label}>Email (Optional)</Text>
@@ -303,42 +292,6 @@ export default function SignupScreen() {
                 placeholderTextColor="#999"
                 value={email}
                 onChangeText={setEmail}
-              />
-            </View>
-
-            <Text style={styles.label}>Password</Text>
-            <View style={styles.inputContainer}>
-              <MaterialIcons
-                name="lock"
-                size={20}
-                color="#999"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Create password (min 6 chars)"
-                secureTextEntry
-                placeholderTextColor="#999"
-                value={password}
-                onChangeText={setPassword}
-              />
-            </View>
-
-            <Text style={styles.label}>Confirm Password</Text>
-            <View style={styles.inputContainer}>
-              <MaterialIcons
-                name="lock"
-                size={20}
-                color="#999"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Confirm your password"
-                secureTextEntry
-                placeholderTextColor="#999"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
               />
             </View>
           </View>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useContext, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,24 +7,25 @@ import {
   Animated,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { TechnicianContext } from "../context/TechnicianContext";
 
-const HeaderScreen = ({ onStatusChange }) => {
-  const [isOnline, setIsOnline] = useState(false);
-  const animatedValue = useState(new Animated.Value(0))[0];
+const HeaderScreen = () => {
+  const { technician, updateOnlineStatus } = useContext(TechnicianContext);
+
+  // Use `useRef` to persist the animated value
+  const animatedValue = useRef(
+    new Animated.Value(technician.isOnline ? 1 : 0)
+  ).current;
 
   const toggleStatus = () => {
-    const newStatus = !isOnline;
-    setIsOnline(newStatus);
+    const newStatus = !technician.isOnline;
+    updateOnlineStatus(newStatus);
 
     Animated.timing(animatedValue, {
       toValue: newStatus ? 1 : 0,
       duration: 200,
       useNativeDriver: true,
     }).start();
-
-    if (onStatusChange) {
-      onStatusChange(newStatus);
-    }
   };
 
   const translateX = animatedValue.interpolate({
@@ -32,30 +33,39 @@ const HeaderScreen = ({ onStatusChange }) => {
     outputRange: [5, 55],
   });
 
+  // Memoize the toggle button style to prevent unnecessary recalculations
+  const toggleButtonStyle = useMemo(
+    () => ({
+      backgroundColor: technician.isOnline ? "#4CAF50" : "#f44336",
+      opacity: technician.overallStatus === "Verified" ? 1 : 0.5,
+    }),
+    [technician.isOnline, technician.overallStatus]
+  );
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.infoContainer}>
-          <Text style={styles.greeting}>Hi, BOSS</Text>
+          <Text style={styles.greeting}>
+            Hi, {technician.name.split(" ")[0]}
+          </Text>
         </View>
 
         <View style={styles.controls}>
           <TouchableOpacity
-            style={[
-              styles.toggleButton,
-              { backgroundColor: isOnline ? "#4CAF50" : "#f44336" },
-            ]}
+            style={[styles.toggleButton, toggleButtonStyle]}
             onPress={toggleStatus}
             activeOpacity={0.8}
+            disabled={technician.overallStatus !== "Verified"}
           >
             <View style={styles.textContainer}>
               <Text
                 style={[
                   styles.toggleText,
-                  isOnline ? styles.onlineText : styles.offlineText,
+                  technician.isOnline ? styles.onlineText : styles.offlineText,
                 ]}
               >
-                {isOnline ? "Online" : "Offline"}
+                {technician.isOnline ? "Online" : "Offline"}
               </Text>
             </View>
             <Animated.View

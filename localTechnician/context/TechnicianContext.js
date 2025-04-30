@@ -19,10 +19,26 @@ export const TechnicianProvider = ({ children }) => {
     bankVerified: false,
     identityVerified: false,
     overallStatus: "Verified",
+    technicianType: "inhouse", // 'inhouse' or 'local'
+    isOnline: false, // New field for online status
   });
 
+  // Dedicated function to update online status
+  const updateOnlineStatus = (status) => {
+    setTechnician((prev) => ({
+      ...prev,
+      isOnline: status,
+    }));
+  };
+
   return (
-    <TechnicianContext.Provider value={{ technician, setTechnician }}>
+    <TechnicianContext.Provider
+      value={{
+        technician,
+        setTechnician,
+        updateOnlineStatus, // Expose status updater
+      }}
+    >
       {children}
     </TechnicianContext.Provider>
   );

@@ -91,7 +91,6 @@ const TaskScreen = () => {
 
 const ProductsScreen = () => (
   <View style={styles.container}>
-    <HeaderScreen />
     <Products />
   </View>
 );
@@ -130,7 +129,7 @@ export default function App() {
   );
 }
 
-// Tab Navigator Component
+// Tab Navigator Component (Updated with Payouts visibility control)
 const TabNavigator = () => {
   const { technician } = useContext(TechnicianContext);
 
@@ -168,28 +167,45 @@ const TabNavigator = () => {
           fontWeight: "600",
         },
         headerShown: false,
-        // Disable Task tab interaction if not verified
+        // Disable Task tab if not verified
+        // tabBarButton:
+        //   route.name === "Task" && technician.overallStatus !== "Verified"
+        //     ? () => {
+        //         return (
+        //           <View style={styles.disabledTab}>
+        //             <MaterialCommunityIcons
+        //               name="clipboard-text-outline"
+        //               size={24}
+        //               color="#ccc"
+        //             />
+        //             <Text style={styles.disabledTabText}>Task</Text>
+        //           </View>
+        //         );
+        //       }
+        //     : undefined,
         tabBarButton:
-          route.name === "Task" && technician.overallStatus !== "Verified"
-            ? () => {
-                return (
-                  <View style={styles.disabledTab}>
-                    <MaterialCommunityIcons
-                      name="clipboard-text-outline"
-                      size={24}
-                      color="#ccc"
-                    />
-                    <Text style={styles.disabledTabText}>Task</Text>
-                  </View>
-                );
-              }
+          route.name === "Task" &&
+          (technician.overallStatus !== "Verified" || !technician.isOnline)
+            ? () => (
+                <View style={styles.disabledTab}>
+                  <MaterialCommunityIcons
+                    name="clipboard-text-outline"
+                    size={24}
+                    color="#ccc"
+                  />
+                  <Text style={styles.disabledTabText}>Task</Text>
+                </View>
+              )
             : undefined,
       })}
     >
       <Tab.Screen name="Task" component={TaskStack} />
       <Tab.Screen name="Products" component={ProductsScreen} />
       <Tab.Screen name="Order History" component={OrderHistoryScreen} />
-      <Tab.Screen name="Payouts" component={PayoutsScreen} />
+      {/* Show Payouts tab ONLY for local technicians */}
+      {technician.technicianType === "local" && (
+        <Tab.Screen name="Payouts" component={PayoutsScreen} />
+      )}
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
