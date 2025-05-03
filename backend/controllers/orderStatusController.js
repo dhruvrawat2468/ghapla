@@ -1,23 +1,41 @@
+import mongoose from "mongoose";
 import OrderStatus from "../models/OrderStatus.js";
 import Order from "../models/orders.js";
 import Device from "../models/devices.js";
 import Technician from "../models/technician.js";
 import { isValidObjectId } from "mongoose";
 
+// Debug: Log OrderStatus to verify import
+console.log("OrderStatus:", OrderStatus);
+
 // Get order status by ID
 export const getOrderById = async (req, res) => {
   try {
     const { orderId } = req.params;
-    console.log(orderId);
+    console.log(`Fetching OrderStatus for orderId: ${orderId}`);
+
+    if (!orderId || !/^[0-9a-fA-F]{24}$/.test(orderId)) {
+      return res.status(400).json({ message: "Valid orderId (24-character hex string) is required" });
+    }
+    if (!OrderStatus || typeof OrderStatus.findOne !== "function") {
+      throw new Error("OrderStatus model is not properly initialized");
+    }
+
     const orderStatus = await OrderStatus.findOne({ orderId });
 
     if (!orderStatus) {
-      return res.status(404).json({ message: "Order not found" });
+      console.warn(`OrderStatus not found for orderId: ${orderId}`);
+      return res.status(404).json({ message: "Order status not found" });
     }
-    console.log("orderstatus found:",orderStatus);
+
+    console.log("OrderStatus found:", orderStatus);
     res.status(200).json(orderStatus);
   } catch (error) {
-    console.error("Error fetching order status:", error.message, error.stack);
+    console.error("Error fetching order status:", {
+      message: error.message,
+      stack: error.stack,
+      mongoError: error.name === "MongoServerError" ? error.code : null,
+    });
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
@@ -26,11 +44,15 @@ export const getOrderById = async (req, res) => {
 export const setArrived = async (req, res) => {
   const { orderId } = req.body;
 
-  if (!orderId || !isValidObjectId(orderId)) {
-    return res.status(400).json({ message: "Valid orderId is required" });
+  if (!orderId || !/^[0-9a-fA-F]{24}$/.test(orderId)) {
+    return res.status(400).json({ message: "Valid orderId (24-character hex string) is required" });
   }
 
   try {
+    if (!OrderStatus || typeof OrderStatus.findOneAndUpdate !== "function") {
+      throw new Error("OrderStatus model is not properly initialized");
+    }
+
     const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -40,6 +62,7 @@ export const setArrived = async (req, res) => {
       { status: "Arrived", paymentStatus: "incomplete", updatedAt: new Date() },
       { new: true, upsert: true }
     );
+    await syncOrderStatus(orderId, orderStatus);
     res.status(200).json({ message: "Status updated to Arrived", orderStatus });
   } catch (error) {
     console.error("Error setting Arrived status:", error.message, error.stack);
@@ -51,32 +74,69 @@ export const setArrived = async (req, res) => {
 export const setCostVerification = async (req, res) => {
   const { orderId, cost, repairDetails } = req.body;
 
-  if (!orderId || !isValidObjectId(orderId)) {
-    return res.status(400).json({ message: "Valid orderId is required" });
+  // Validate input
+  if (!orderId || !/^[0-9a-fA-F]{24}$/.test(orderId)) {
+    return res.status(400).json({ message: "Valid orderId (24-character hex string) is required" });
   }
-  if (!cost || !repairDetails || !Array.isArray(repairDetails)) {
-    return res.status(400).json({ message: "Cost and repairDetails are required" });
+  if (!cost || isNaN(parseFloat(cost))) {
+    return res.status(400).json({ message: "Valid cost is required" });
+  }
+  if (!repairDetails || !Array.isArray(repairDetails) || repairDetails.length === 0) {
+    return res.status(400).json({ message: "repairDetails must be a non-empty array" });
   }
 
   try {
-    const orderStatus = await OrderStatus.findOne({ orderId });
-    if (!orderStatus) {
-      return res.status(404).json({ message: "Order not found" });
+    if (!OrderStatus || typeof OrderStatus.findOneAndUpdate !== "function") {
+      throw new Error("OrderStatus model is not properly initialized");
     }
-    if (orderStatus.status !== "Arrived") {
-      return res.status(400).json({ message: "Order must be in Arrived status" });
+
+    // Validate previous status
+    const validPreviousStatuses = ["unaccepted", "accepted", "Arrived"];
+    const existingStatus = await OrderStatus.findOne({ orderId });
+    if (existingStatus && !validPreviousStatuses.includes(existingStatus.status)) {
+      return res.status(400).json({
+        message: `Order must be in one of ${validPreviousStatuses.join(", ")} to set Cost Verification`,
+      });
     }
-    const sanitizedRepairDetails = repairDetails.map(item => ({
+
+    // Sanitize repairDetails
+    const sanitizedRepairDetails = repairDetails.map((item) => ({
       whatRepaired: item.whatRepaired || "",
       cost: parseFloat(item.cost) || 0,
     }));
-    orderStatus.status = "Cost Verification";
-    orderStatus.cost = parseFloat(cost) || 0;
-    orderStatus.repairDetails = sanitizedRepairDetails;
-    orderStatus.paymentStatus = "incomplete";
-    orderStatus.updatedAt = new Date();
-    await orderStatus.save();
-    res.status(200).json({ message: "Status updated to Cost Verification", orderStatus });
+
+    // Update or create OrderStatus document
+    const orderStatus = await OrderStatus.findOneAndUpdate(
+      { orderId },
+      {
+        status: "Cost Verification",
+        cost: parseFloat(cost) || 0,
+        paymentStatus: "incomplete",
+        repairDetails: sanitizedRepairDetails,
+        updatedAt: new Date(),
+      },
+      { new: true, upsert: true }
+    );
+
+    if (!orderStatus) {
+      return res.status(404).json({ message: "Order status could not be updated" });
+    }
+
+    // Sync with Order collection
+    await syncOrderStatus(orderId, orderStatus);
+
+    // Response with fields entered by technician
+    res.status(200).json({
+      message: "Status updated to Cost Verification",
+      orderStatus: {
+        orderId: orderStatus.orderId,
+        status: orderStatus.status,
+        cost: orderStatus.cost,
+        paymentStatus: orderStatus.paymentStatus,
+        repairDetails: orderStatus.repairDetails,
+        updatedAt: orderStatus.updatedAt,
+      },
+    });
   } catch (error) {
     console.error("Error setting Cost Verification status:", error.message, error.stack);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -87,11 +147,15 @@ export const setCostVerification = async (req, res) => {
 export const acceptCost = async (req, res) => {
   const { orderId } = req.body;
 
-  if (!orderId || !isValidObjectId(orderId)) {
-    return res.status(400).json({ message: "Valid orderId is required" });
+  if (!orderId || !/^[0-9a-fA-F]{24}$/.test(orderId)) {
+    return res.status(400).json({ message: "Valid orderId (24-character hex string) is required" });
   }
 
   try {
+    if (!OrderStatus || typeof OrderStatus.findOneAndUpdate !== "function") {
+      throw new Error("OrderStatus model is not properly initialized");
+    }
+
     const orderStatus = await OrderStatus.findOneAndUpdate(
       { orderId, status: "Cost Verification" },
       {
@@ -106,6 +170,7 @@ export const acceptCost = async (req, res) => {
       return res.status(404).json({ message: "Order not found or not in Cost Verification status" });
     }
 
+    await syncOrderStatus(orderId, orderStatus);
     res.status(200).json({ message: "Cost accepted successfully", orderStatus });
   } catch (error) {
     console.error("Error accepting cost:", error.message, error.stack);
@@ -117,11 +182,15 @@ export const acceptCost = async (req, res) => {
 export const rejectCost = async (req, res) => {
   const { orderId } = req.body;
 
-  if (!orderId || !isValidObjectId(orderId)) {
-    return res.status(400).json({ message: "Valid orderId is required" });
+  if (!orderId || !/^[0-9a-fA-F]{24}$/.test(orderId)) {
+    return res.status(400).json({ message: "Valid orderId (24-character hex string) is required" });
   }
 
   try {
+    if (!OrderStatus || typeof OrderStatus.findOneAndUpdate !== "function") {
+      throw new Error("OrderStatus model is not properly initialized");
+    }
+
     const orderStatus = await OrderStatus.findOneAndUpdate(
       { orderId, status: "Cost Verification" },
       {
@@ -138,6 +207,7 @@ export const rejectCost = async (req, res) => {
       return res.status(404).json({ message: "Order not found or not in Cost Verification status" });
     }
 
+    await syncOrderStatus(orderId, orderStatus);
     res.status(200).json({ message: "Cost rejected successfully", orderStatus });
   } catch (error) {
     console.error("Error rejecting cost:", error.message, error.stack);
@@ -149,14 +219,18 @@ export const rejectCost = async (req, res) => {
 export const updateOrderStatus = async (req, res) => {
   const { orderId, status, paymentStatus } = req.body;
 
-  if (!orderId || !status || !paymentStatus || !isValidObjectId(orderId)) {
-    return res.status(400).json({ message: "orderId, status, and paymentStatus are required" });
+  if (!orderId || !status || !paymentStatus || !/^[0-9a-fA-F]{24}$/.test(orderId)) {
+    return res.status(400).json({ message: "Valid orderId (24-character hex string), status, and paymentStatus are required" });
   }
   if (status !== "Ready to Deliver" || paymentStatus !== "completed") {
     return res.status(400).json({ message: "Invalid status or paymentStatus for payment update" });
   }
 
   try {
+    if (!OrderStatus || typeof OrderStatus.findOneAndUpdate !== "function") {
+      throw new Error("OrderStatus model is not properly initialized");
+    }
+
     const orderStatus = await OrderStatus.findOneAndUpdate(
       { orderId, status: "Repair in Progress" },
       { status, paymentStatus, updatedAt: new Date() },
@@ -167,6 +241,7 @@ export const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ message: "Order not found or not in Repair in Progress status" });
     }
 
+    await syncOrderStatus(orderId, orderStatus);
     res.status(200).json({ message: "Order status updated successfully", orderStatus });
   } catch (error) {
     console.error("Error updating order status:", error.message, error.stack);
@@ -179,9 +254,11 @@ export const syncOrderStatus = async (orderId, orderStatus) => {
   try {
     const order = await Order.findById(orderId);
     if (!order) {
-      throw new Error("Order not found");
+      console.warn(`Order not found for orderId: ${orderId}`);
+      return;
     }
-    order.status = orderStatus;
+    order.cost = orderStatus.cost;
+    order.paymentStatus = orderStatus.paymentStatus;
     await order.save();
   } catch (error) {
     console.error("Error syncing order status:", error.message, error.stack);
@@ -193,11 +270,15 @@ export const acceptOrder = async (req, res) => {
   const { orderId } = req.params;
   const { technicianId } = req.body;
 
-  if (!isValidObjectId(orderId) || !isValidObjectId(technicianId)) {
-    return res.status(400).json({ message: "Invalid order ID or technician ID" });
+  if (!orderId || !/^[0-9a-fA-F]{24}$/.test(orderId) || !isValidObjectId(technicianId)) {
+    return res.status(400).json({ message: "Valid orderId (24-character hex string) and technicianId (ObjectId) are required" });
   }
 
   try {
+    if (!OrderStatus || typeof OrderStatus.findOne !== "function") {
+      throw new Error("OrderStatus model is not properly initialized");
+    }
+
     const orderStatus = await OrderStatus.findOne({ orderId });
     if (!orderStatus || orderStatus.status !== "unaccepted") {
       return res.status(400).json({ message: "Order not found or not unaccepted" });
@@ -209,7 +290,7 @@ export const acceptOrder = async (req, res) => {
     orderStatus.status = "accepted";
     orderStatus.updatedAt = new Date();
     await orderStatus.save();
-    await syncOrderStatus(orderId, "accepted");
+    await syncOrderStatus(orderId, orderStatus);
     res.status(200).json({ message: "Order accepted successfully", orderStatus });
   } catch (error) {
     console.error("Error accepting order:", error.message, error.stack);
@@ -222,11 +303,15 @@ export const completeOrder = async (req, res) => {
   const { orderId } = req.params;
   const { technicianId } = req.body;
 
-  if (!isValidObjectId(orderId) || !isValidObjectId(technicianId)) {
-    return res.status(400).json({ message: "Invalid order ID or technician ID" });
+  if (!orderId || !/^[0-9a-fA-F]{24}$/.test(orderId) || !isValidObjectId(technicianId)) {
+    return res.status(400).json({ message: "Valid orderId (24-character hex string) and technicianId (ObjectId) are required" });
   }
 
   try {
+    if (!OrderStatus || typeof OrderStatus.findOne !== "function") {
+      throw new Error("OrderStatus model is not properly initialized");
+    }
+
     const orderStatus = await OrderStatus.findOne({ orderId });
     if (!orderStatus || orderStatus.status !== "accepted") {
       return res.status(400).json({ message: "Order not found or not accepted" });
@@ -238,7 +323,7 @@ export const completeOrder = async (req, res) => {
     orderStatus.status = "completed";
     orderStatus.updatedAt = new Date();
     await orderStatus.save();
-    await syncOrderStatus(orderId, "completed");
+    await syncOrderStatus(orderId, orderStatus);
     res.status(200).json({ message: "Order completed successfully", orderStatus });
   } catch (error) {
     console.error("Error completing order:", error.message, error.stack);
@@ -251,11 +336,15 @@ export const declineOrder = async (req, res) => {
   const { orderId } = req.params;
   const { technicianId } = req.body;
 
-  if (!isValidObjectId(orderId) || !isValidObjectId(technicianId)) {
-    return res.status(400).json({ message: "Invalid order ID or technician ID" });
+  if (!orderId || !/^[0-9a-fA-F]{24}$/.test(orderId) || !isValidObjectId(technicianId)) {
+    return res.status(400).json({ message: "Valid orderId (24-character hex string) and technicianId (ObjectId) are required" });
   }
 
   try {
+    if (!OrderStatus || typeof OrderStatus.findOne !== "function") {
+      throw new Error("OrderStatus model is not properly initialized");
+    }
+
     const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -263,10 +352,6 @@ export const declineOrder = async (req, res) => {
     if (order.technicianId.toString() !== technicianId) {
       return res.status(403).json({ message: "You are not authorized to decline this order" });
     }
-    if (order.status !== "unaccepted") {
-      return res.status(400).json({ message: "Only unaccepted orders can be declined" });
-    }
-
     const orderStatus = await OrderStatus.findOne({ orderId });
     if (!orderStatus || orderStatus.status !== "unaccepted") {
       return res.status(400).json({ message: "Order not found or not unaccepted in OrderStatus" });
@@ -281,12 +366,12 @@ export const declineOrder = async (req, res) => {
     }
 
     const availableTechnicians = Array.isArray(device.technicianIds) ? device.technicianIds : [];
-    const validTechnicians = availableTechnicians.filter(id => isValidObjectId(id));
+    const validTechnicians = availableTechnicians.filter((id) => isValidObjectId(id));
     if (validTechnicians.length === 0) {
       return res.status(400).json({ message: "No valid technicians available to reassign" });
     }
 
-    const otherTechnicians = validTechnicians.filter(id => id.toString() !== technicianId);
+    const otherTechnicians = validTechnicians.filter((id) => id.toString() !== technicianId);
     if (otherTechnicians.length === 0) {
       return res.status(400).json({ message: "No other technicians available to reassign" });
     }
@@ -309,7 +394,7 @@ export const declineOrder = async (req, res) => {
     orderStatus.status = "unaccepted";
     orderStatus.updatedAt = new Date();
     await orderStatus.save();
-    await syncOrderStatus(orderId, "unaccepted");
+    await syncOrderStatus(orderId, orderStatus);
 
     res.status(200).json({
       message: "Order declined and reassigned successfully",

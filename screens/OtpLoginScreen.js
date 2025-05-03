@@ -14,50 +14,93 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import {
   MaterialIcons,
-  Ionicons,
   FontAwesome,
-  Entypo,
 } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import API from "../utils/api";
 
 export default function OtpLoginScreen() {
   const [mobileNumber, setMobileNumber] = useState("");
   const [otp, setOtp] = useState("");
+  const [errorLogs, setErrorLogs] = useState([]); // Store error logs
   const navigation = useNavigation();
 
+  // Add error to logs
+  const logError = (message, error) => {
+    const log = {
+      timestamp: new Date().toISOString(),
+      message,
+      error: error?.message || "Unknown error",
+      stack: error?.stack || null,
+    };
+    setErrorLogs((prev) => [...prev, log]);
+    console.error(`[${log.timestamp}] ${message}:`, error);
+  };
+
   const sendOTP = async () => {
-    if (!mobileNumber) {
-      Alert.alert("Error", "Please enter your mobile number.");
+    // Validate mobile number
+    if (!mobileNumber || !/^\d{10}$/.test(mobileNumber)) {
+      const errorMsg = "Please enter a valid 10-digit mobile number.";
+      logError(errorMsg, new Error(errorMsg));
+      Alert.alert("Error", errorMsg);
       return;
     }
 
     try {
-      const response = await API.post("/api/send_otp", { mobileNumber });
-      Alert.alert("Success", "OTP sent successfully!");
+      const response = await API.post("/api/send", { mobileNumber: mobileNumber });
+      if (response.data.success) {
+        Alert.alert("Success", response.data.message || "OTP sent successfully!");
+      } else {
+        throw new Error(response.data.message || "Failed to send OTP");
+      }
     } catch (error) {
-      Alert.alert(
-        "Error",
-        error.response?.data?.message || "Failed to send OTP"
-      );
+      const errorMsg = error.response?.data?.message || "Failed to send OTP";
+      logError("Send OTP failed", error);
+      Alert.alert("Error", errorMsg);
     }
   };
 
-  const verifyOTP = async () => {
-    if (!mobileNumber || !otp) {
-      Alert.alert("Error", "Please enter mobile number and OTP.");
+  const loginWithOTP = async () => {
+    // Validate inputs
+    if (!mobileNumber || !/^\d{10}$/.test(mobileNumber)) {
+      const errorMsg = "Please enter a valid 10-digit mobile number.";
+      logError(errorMsg, new Error(errorMsg));
+      Alert.alert("Error", errorMsg);
+      return;
+    }
+    if (!otp) {
+      const errorMsg = "Please enter the OTP.";
+      logError(errorMsg, new Error(errorMsg));
+      Alert.alert("Error", errorMsg);
       return;
     }
 
     try {
-      const response = await API.post("/api/verify_otp", { mobileNumber, otp });
-      Alert.alert("Success", "OTP Verified!");
-      navigation.navigate("HomeScreen");
+      const response = await API.post("/auth/login", { mobileNumber, otp });
+      if (response.data.message === "Login successful") {
+        // Store JWT token
+        await AsyncStorage.setItem("token", response.data.token);
+        
+        // Optionally store user data
+        await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
+
+        Alert.alert("Success", response.data.message);
+        // Navigate to HomeScreen, optionally passing user data
+        navigation.navigate("HomeMain", { user: response.data.user });
+      } else {
+        throw new Error(response.data.error || "OTP login failed");
+      }
     } catch (error) {
-      Alert.alert(
-        "Error",
-        error.response?.data?.message || "OTP verification failed"
-      );
+      const errorMsg = error.response?.data?.error || "OTP login failed";
+      logError("Login with OTP failed", error);
+      Alert.alert("Error", errorMsg);
     }
+  };
+
+  // Debug function to view error logs
+  const viewErrorLogs = () => {
+    console.log("Error Logs:", errorLogs);
+    Alert.alert("Debug Logs", JSON.stringify(errorLogs, null, 2));
   };
 
   return (
@@ -131,10 +174,19 @@ export default function OtpLoginScreen() {
             />
           </View>
 
-          {/* Verify OTP Button */}
-          <TouchableOpacity style={styles.button} onPress={verifyOTP}>
+          {/* Login with OTP Button */}
+          <TouchableOpacity style={styles.button} onPress={loginWithOTP}>
             <MaterialIcons name="verified" size={18} color="#fff" />
-            <Text style={styles.buttonText}> VERIFY OTP</Text>
+            <Text style={styles.buttonText}> LOGIN WITH OTP</Text>
+          </TouchableOpacity>
+
+          {/* Debug Button (Hidden, for developers) */}
+          <TouchableOpacity
+            style={styles.debugButton}
+            onPress={viewErrorLogs}
+            activeOpacity={0.1}
+          >
+            <Text style={styles.debugButtonText}>Debug Logs</Text>
           </TouchableOpacity>
 
           {/* Signup Link with Icon */}
@@ -253,20 +305,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 5,
   },
-  loginLinkContainer: {
-    marginTop: 20,
-    width: "100%",
-    alignItems: "center",
-  },
-  loginLink: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  loginLinkText: {
-    color: "#fd7e14",
-    fontWeight: "bold",
-    fontSize: 14,
-  },
   signupContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -290,5 +328,14 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 100,
     resizeMode: "cover",
+  },
+  debugButton: {
+    marginTop: 10,
+    padding: 5,
+    opacity: 0.1, // Hidden but accessible for debugging
+  },
+  debugButtonText: {
+    color: "#999",
+    fontSize: 12,
   },
 });

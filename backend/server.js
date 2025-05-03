@@ -21,7 +21,7 @@ import complaintRoutes from "./routes/complaintroutes.js";
 const app = express();
 app.use(
   cors({
-    origin: "http://192.168.251.1:8081", // Allow your frontend URL
+    origin: "http://192.168.1.6:8081", // Allow your frontend URL
       credentials: true, // Allow cookies to be sent with requests
     })
   );

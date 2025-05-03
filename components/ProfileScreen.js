@@ -13,7 +13,6 @@ import {
 import {
   MaterialIcons,
   Ionicons,
-  FontAwesome,
   MaterialCommunityIcons,
   Entypo,
   Feather,
@@ -62,10 +61,20 @@ const ProfileScreen = () => {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      try {
-        if (!userToken) return;
+      // If userProfile already exists, skip the API call
+      if (userProfile) {
+        setLoading(false);
+        return;
+      }
 
-        const response = await axios.get("http://192.168.1.8:7000/api/other/profile", {
+      // If no userToken, skip the API call
+      if (!userToken) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await axios.get("http://192.168.1.6:7000/api/other/profile", {
           headers: { Authorization: `Bearer ${userToken}` },
         });
 
@@ -80,12 +89,12 @@ const ProfileScreen = () => {
 
     fetchProfile();
     cardOffsetY.value = withSpring(0, { damping: 15, stiffness: 100, mass: 1 });
-  }, [userToken, setUserProfile]);
+  }, [userToken, userProfile, setUserProfile]);
 
   const handleLogout = async () => {
     try {
       await logout();
-      navigation.replace("LoginA");
+      navigation.replace("OtpLogin");
     } catch (error) {
       console.error("Logout error:", error);
       Alert.alert("Error", "Failed to log out. Please try again.");
@@ -114,25 +123,22 @@ const ProfileScreen = () => {
     scale.value = withSpring(1, { damping: 10, stiffness: 100 });
   };
 
-  // Use default image if profile image is not available
-  const profileImage = 
-    userProfile?.profileImage || "https://randomuser.me/api/portraits/men/32.jpg";
-
-  // Address formatting
-  const formatAddress = () => {
-    if (userProfile?.address?.[0]?.address && userProfile?.address?.[0]?.city) {
-      return `${userProfile.address[0].address}, ${userProfile.address[0].city}`;
-    } else if (userProfile?.address) {
-      return `${userProfile.address.street}, ${userProfile.address.city}, ${userProfile.address.state} ${userProfile.address.postalCode}`;
-    }
-    return "Not provided";
-  };
+  // Use default image since profileImage is not in schema
+  const profileImage = "https://randomuser.me/api/portraits/men/32.jpg";
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FD7E14" />
         <Text style={styles.loadingText}>Loading Profile...</Text>
+      </View>
+    );
+  }
+
+  if (!userProfile) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>No profile data available</Text>
       </View>
     );
   }
@@ -159,10 +165,10 @@ const ProfileScreen = () => {
             )}
           </Animated.View>
         </TouchableOpacity>
-        <Text style={styles.name}>{userProfile?.name || "User Name"}</Text>
+        <Text style={styles.name}>{userProfile.name || "User Name"}</Text>
         <View style={styles.emailContainer}>
           <Ionicons name="mail-outline" size={16} color="#666" />
-          <Text style={styles.email}>{userProfile?.email || "No email provided"}</Text>
+          <Text style={styles.email}>{userProfile.email || "No email provided"}</Text>
         </View>
       </Animated.View>
 
@@ -175,8 +181,7 @@ const ProfileScreen = () => {
             color="#FD7E14"
           />
           <Text style={styles.sectionTitle}>Personal Information</Text>
-          
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.expandButton}
             onPress={() => setIsInfoExpanded(!isInfoExpanded)}
           >
@@ -188,14 +193,14 @@ const ProfileScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {(isInfoExpanded || !isInfoExpanded) && (
+        {isInfoExpanded && (
           <>
             <View style={styles.infoItem}>
               <View style={styles.infoIcon}>
                 <MaterialIcons name="calendar-today" size={20} color="#FD7E14" />
                 <Text style={styles.infoLabel}>Age</Text>
               </View>
-              <Text style={styles.infoValue}>{userProfile?.age || "Not provided"}</Text>
+              <Text style={styles.infoValue}>{userProfile.age || "Not provided"}</Text>
             </View>
 
             <View style={styles.infoItem}>
@@ -207,7 +212,9 @@ const ProfileScreen = () => {
                 />
                 <Text style={styles.infoLabel}>Gender</Text>
               </View>
-              <Text style={styles.infoValue}>{userProfile?.gender || "Not provided"}</Text>
+              <Text style={styles.infoValue}>
+                {userProfile.gender ? userProfile.gender.charAt(0).toUpperCase() + userProfile.gender.slice(1) : "Not provided"}
+              </Text>
             </View>
 
             <View style={styles.infoItem}>
@@ -215,7 +222,17 @@ const ProfileScreen = () => {
                 <Feather name="phone" size={20} color="#FD7E14" />
                 <Text style={styles.infoLabel}>Mobile</Text>
               </View>
-              <Text style={styles.infoValue}>{userProfile?.mobile || "Not provided"}</Text>
+              <Text style={styles.infoValue}>{userProfile.mobile || "Not provided"}</Text>
+            </View>
+
+            <View style={styles.infoItem}>
+              <View style={styles.infoIcon}>
+                <MaterialIcons name="work" size={20} color="#FD7E14" />
+                <Text style={styles.infoLabel}>Role</Text>
+              </View>
+              <Text style={styles.infoValue}>
+                {userProfile.role ? userProfile.role.charAt(0).toUpperCase() + userProfile.role.slice(1) : "Not provided"}
+              </Text>
             </View>
           </>
         )}
@@ -228,49 +245,53 @@ const ProfileScreen = () => {
           <Text style={styles.sectionTitle}>Address</Text>
         </View>
 
-        <View style={styles.infoItem}>
-          <View style={styles.infoIcon}>
-            <MaterialIcons name="home" size={20} color="#FD7E14" />
-            <Text style={styles.infoLabel}>Street</Text>
-          </View>
-          <Text style={styles.infoValue}>
-            {userProfile?.address?.street || userProfile?.address?.[0]?.address || "Not provided"}
-          </Text>
-        </View>
+        {userProfile.address && userProfile.address.length > 0 ? (
+          <>
+            <View style={styles.infoItem}>
+              <View style={styles.infoIcon}>
+                <MaterialIcons name="home" size={20} color="#FD7E14" />
+                <Text style={styles.infoLabel}>House Number</Text>
+              </View>
+              <Text style={styles.infoValue}>{userProfile.address[0].houseNumber || "Not provided"}</Text>
+            </View>
 
-        <View style={styles.infoItem}>
-          <View style={styles.infoIcon}>
-            <MaterialIcons name="location-city" size={20} color="#FD7E14" />
-            <Text style={styles.infoLabel}>City</Text>
-          </View>
-          <Text style={styles.infoValue}>
-            {userProfile?.address?.city || userProfile?.address?.[0]?.city || "Not provided"}
-          </Text>
-        </View>
+            <View style={styles.infoItem}>
+              <View style={styles.infoIcon}>
+                <MaterialIcons name="map" size={20} color="#FD7E14" />
+                <Text style={styles.infoLabel}>Street</Text>
+              </View>
+              <Text style={styles.infoValue}>{userProfile.address[0].street || "Not provided"}</Text>
+            </View>
 
-        <View style={styles.infoItem}>
-          <View style={styles.infoIcon}>
-            <FontAwesome name="map" size={18} color="#FD7E14" />
-            <Text style={styles.infoLabel}>State</Text>
-          </View>
-          <Text style={styles.infoValue}>
-            {userProfile?.address?.state || "Not provided"}
-          </Text>
-        </View>
+            <View style={styles.infoItem}>
+              <View style={styles.infoIcon}>
+                <MaterialIcons name="location-on" size={20} color="#FD7E14" />
+                <Text style={styles.infoLabel}>Landmark</Text>
+              </View>
+              <Text style={styles.infoValue}>{userProfile.address[0].landmark || "Not provided"}</Text>
+            </View>
 
-        <View style={styles.infoItem}>
-          <View style={styles.infoIcon}>
-            <MaterialIcons
-              name="markunread-mailbox"
-              size={20}
-              color="#FD7E14"
-            />
-            <Text style={styles.infoLabel}>Postal Code</Text>
+            <View style={styles.infoItem}>
+              <View style={styles.infoIcon}>
+                <MaterialIcons name="location-city" size={20} color="#FD7E14" />
+                <Text style={styles.infoLabel}>City</Text>
+              </View>
+              <Text style={styles.infoValue}>{userProfile.address[0].city || "Not provided"}</Text>
+            </View>
+
+            <View style={styles.infoItem}>
+              <View style={styles.infoIcon}>
+                <MaterialIcons name="markunread-mailbox" size={20} color="#FD7E14" />
+                <Text style={styles.infoLabel}>Pincode</Text>
+              </View>
+              <Text style={styles.infoValue}>{userProfile.address[0].pincode || "Not provided"}</Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.infoItem}>
+            <Text style={styles.infoValue}>No address provided</Text>
           </View>
-          <Text style={styles.infoValue}>
-            {userProfile?.address?.postalCode || "Not provided"}
-          </Text>
-        </View>
+        )}
       </Animated.View>
 
       {/* Action Buttons */}
@@ -287,7 +308,7 @@ const ProfileScreen = () => {
           </Animated.View>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.logoutButton}
           onPressIn={() => handlePressIn(logoutScale)}
           onPressOut={() => handlePressOut(logoutScale)}
@@ -442,7 +463,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FD7E14",
     padding: 15,
-    borderRadius: 10, 
+    borderRadius: 10,
     marginLeft: 10,
     shadowColor: "#FD7E14",
     shadowOffset: { width: 0, height: 2 },

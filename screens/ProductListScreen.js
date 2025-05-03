@@ -28,7 +28,7 @@ const ProductListScreen = () => {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const response = await fetch("http://192.168.1.8:7000/api/devices/all");
+        const response = await fetch("http://192.168.1.6:7000/api/devices/all");
         if (!response.ok) throw new Error("Failed to fetch devices");
         const devices = await response.json();
         console.log("Raw devices:", devices); // Debug backend data
@@ -75,7 +75,7 @@ const ProductListScreen = () => {
     const imageMap = {
       AC: require("../assets/images/1ac.png"),
       "Air Conditioner": require("../assets/images/1ac.png"),
-      Fridge: require("../assets/images/fridge.png"),
+      Fridge: require("../assets/images/fridg.png"),
       Geyser: require("../assets/images/1geyser.png"),
       "Washing Machine": require("../assets/images/1washing.png"),
       RO: require("../assets/images/RO.png"),

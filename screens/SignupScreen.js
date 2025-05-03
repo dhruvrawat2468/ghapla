@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   View,
   Text,
@@ -12,30 +12,44 @@ import {
   Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { Picker } from "@react-native-picker/picker";
 import {
   MaterialIcons,
-  FontAwesome,
-  Ionicons,
   Feather,
   MaterialCommunityIcons,
-  Entypo,
+  Ionicons,
 } from "@expo/vector-icons";
+import { AuthContext } from "../context/AuthContext";
 import API from "../utils/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function SignupScreen() {
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState("");
+  const [houseNumber, setHouseNumber] = useState("");
+  const [landmark, setLandmark] = useState("");
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("");
+  const [pincode, setPincode] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [houseNumber, setHouseNumber] = useState("");
-  const [landmark, setLandmark] = useState("");
-  const [street, setStreet] = useState("");
-  const [city, setCity] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const navigation = useNavigation();
+  const authContext = useContext(AuthContext);
+  const { setUserToken, setUserProfile, setIsLoggedOut } = authContext;
+
+  // Debug context values
+  console.log("AuthContext values:", {
+    setUserToken: typeof setUserToken,
+    setUserProfile: typeof setUserProfile,
+    setIsLoggedOut: typeof setIsLoggedOut,
+  });
+
+  const sanitizeString = (str) => str.replace(/[^a-zA-Z0-9\s-,.]/g, "");
 
   const validate = () => {
     if (
@@ -44,20 +58,29 @@ export default function SignupScreen() {
       !houseNumber ||
       !landmark ||
       !street ||
+      !city ||
+      !pincode ||
       !age ||
       !gender ||
+      !email ||
       !password ||
       !confirmPassword
     ) {
-      Alert.alert("Error", "All fields except email are required.");
+      Alert.alert("Error", "All fields are required.");
       return false;
     }
-    if (mobile.length !== 10 || isNaN(mobile)) {
+    const cleanedMobile = mobile.replace(/\D/g, '');
+    if (cleanedMobile.length !== 10) {
       Alert.alert("Error", "Mobile number must be 10 digits.");
       return false;
     }
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
-      Alert.alert("Error", "Enter a valid email address if provided.");
+    const cleanedPincode = pincode.replace(/\D/g, '');
+    if (cleanedPincode.length !== 6) {
+      Alert.alert("Error", "Pincode must be 6 digits.");
+      return false;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      Alert.alert("Error", "Enter a valid email address.");
       return false;
     }
     if (isNaN(age) || age < 1 || age > 120) {
@@ -78,28 +101,77 @@ export default function SignupScreen() {
   const handleSignup = async () => {
     if (!validate()) return;
 
+    const cleanedMobile = mobile.replace(/\D/g, '');
+    const cleanedPincode = pincode.replace(/\D/g, '');
+
     const payload = {
-      name,
+      name: sanitizeString(name),
       email,
-      phone: mobile,
-      password,
+      password: sanitizeString(password),
+      mobile: cleanedMobile,
       age: parseInt(age),
-      gender,
-      address: {
-        houseNumber,
-        landmark,
-        street,
-        city,
-      },
+      gender: gender.toLowerCase(),
+      address: [{
+        houseNumber: sanitizeString(houseNumber),
+        landmark: sanitizeString(landmark),
+        street: sanitizeString(street),
+        city: sanitizeString(city),
+        pincode: cleanedPincode,
+      }],
     };
 
+    setIsLoading(true);
     try {
-      const response = await API.post("/api/signup", payload);
-      Alert.alert("Success", "Account created successfully!", [
-        { text: "OK", onPress: () => navigation.navigate("Login") },
+      console.log("Sending signup request to:", API.defaults.baseURL + "/auth/signup");
+      console.log("Payload:", JSON.stringify(payload, null, 2));
+      if (typeof payload !== "object" || payload === null) {
+        throw new Error("Payload is not an object");
+      }
+      const response = await API.post("/auth/signup", payload);
+      const { token, user } = response.data;
+
+      console.log("🔹 Signup Response:", response.data);
+
+      // Validate context functions
+      if (typeof setUserToken !== "function") {
+        throw new Error("setUserToken is not a function");
+      }
+      if (typeof setUserProfile !== "function") {
+        throw new Error("setUserProfile is not a function");
+      }
+      if (typeof setIsLoggedOut !== "function") {
+        throw new Error("setIsLoggedOut is not a function");
+      }
+
+      // Store token and user profile
+      await AsyncStorage.setItem("authToken", token);
+      await AsyncStorage.setItem("userProfile", JSON.stringify(user));
+      setUserToken(token);
+      setUserProfile(user);
+      setIsLoggedOut(false);
+
+      Alert.alert("Success", "Account created and logged in successfully!", [
+        { text: "OK", onPress: () => navigation.navigate("HomeMain") },
       ]);
     } catch (error) {
-      Alert.alert("Error", error.response?.data?.message || "Signup failed");
+      console.error("❌ Signup Error:", {
+        message: error.message,
+        response: error.response?.data,
+        config: error.config,
+      });
+      let errorMessage = "Signup failed. Please try again.";
+      if (error.response?.status === 400 && error.response.data.errors) {
+        errorMessage = error.response.data.errors.map(err => err.msg).join("\n");
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message; // Display backend message (e.g., "User with this email already exists")
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message.includes("setUserToken")) {
+        errorMessage = "Authentication context error. Please restart the app.";
+      }
+      Alert.alert("Error", errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -116,7 +188,7 @@ export default function SignupScreen() {
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false} // Removed scrollbar
+          showsVerticalScrollIndicator={false}
         >
           <Text style={styles.title}>Sign Up</Text>
           <Text style={styles.subtitle}>Create an account to get started!</Text>
@@ -184,12 +256,16 @@ export default function SignupScreen() {
                 color="#fd7e14"
                 style={styles.icon}
               />
-              <TextInput
-                style={styles.input}
-                placeholder="Gender* (Male/Female/Other)"
-                value={gender}
-                onChangeText={setGender}
-              />
+              <Picker
+                selectedValue={gender}
+                onValueChange={(value) => setGender(value)}
+                style={styles.picker}
+              >
+                <Picker.Item label="Select gender*" value="" />
+                <Picker.Item label="Male" value="male" />
+                <Picker.Item label="Female" value="female" />
+                <Picker.Item label="Other" value="other" />
+              </Picker>
             </View>
 
             <View style={styles.inputContainer}>
@@ -201,7 +277,7 @@ export default function SignupScreen() {
               />
               <TextInput
                 style={styles.input}
-                placeholder="Email (Optional)"
+                placeholder="Email*"
                 keyboardType="email-address"
                 value={email}
                 onChangeText={setEmail}
@@ -209,16 +285,145 @@ export default function SignupScreen() {
             </View>
           </View>
 
-         
+          {/* Address Information Section */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>
+              <MaterialIcons name="location-on" size={18} color="#565656" />{" "}
+              Address Information
+            </Text>
 
-          <TouchableOpacity style={styles.button} onPress={handleSignup}>
+            <View style={styles.inputContainer}>
+              <MaterialIcons
+                name="home"
+                size={20}
+                color="#fd7e14"
+                style={styles.icon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="House Number*"
+                value={houseNumber}
+                onChangeText={setHouseNumber}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <MaterialIcons
+                name="location-city"
+                size={20}
+                color="#fd7e14"
+                style={styles.icon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Landmark*"
+                value={landmark}
+                onChangeText={setLandmark}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <MaterialIcons
+                name="map"
+                size={20}
+                color="#fd7e14"
+                style={styles.icon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Street*"
+                value={street}
+                onChangeText={setStreet}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <MaterialIcons
+                name="location-city"
+                size={20}
+                color="#fd7e14"
+                style={styles.icon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="City*"
+                value={city}
+                onChangeText={setCity}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <MaterialIcons
+                name="pin-drop"
+                size={20}
+                color="#fd7e14"
+                style={styles.icon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Pincode*"
+                keyboardType="numeric"
+                maxLength={6}
+                value={pincode}
+                onChangeText={setPincode}
+              />
+            </View>
+          </View>
+
+          {/* Password Section */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>
+              <MaterialIcons name="lock-outline" size={18} color="#565656" />{" "}
+              Password
+            </Text>
+
+            <View style={styles.inputContainer}>
+              <MaterialIcons
+                name="lock"
+                size={20}
+                color="#fd7e14"
+                style={styles.icon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Password*"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <MaterialIcons
+                name="lock"
+                size={20}
+                color="#fd7e14"
+                style={styles.icon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Confirm Password*"
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.button, isLoading && styles.buttonDisabled]}
+            onPress={handleSignup}
+            disabled={isLoading}
+          >
             <MaterialIcons name="how-to-reg" size={20} color="#fff" />
-            <Text style={styles.buttonText}> SIGN UP</Text>
+            <Text style={styles.buttonText}>
+              {isLoading ? " SIGNING UP..." : " SIGN UP"}
+            </Text>
           </TouchableOpacity>
 
           <View style={styles.loginLinkContainer}>
             <Text style={styles.loginText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate("OtpLogin")}>
+            <TouchableOpacity onPress={() => navigation.navigate("LoginA")}>
               <View style={styles.loginLink}>
                 <Ionicons name="log-in" size={16} color="#fd7e14" />
                 <Text style={styles.loginLinkText}> Sign In</Text>
@@ -292,6 +497,14 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     fontSize: 16,
   },
+  picker: {
+    flex: 1,
+    height: 44,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
   button: {
     width: "100%",
     backgroundColor: "#fd7e14",
@@ -302,6 +515,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     flexDirection: "row",
     justifyContent: "center",
+  },
+  buttonDisabled: {
+    backgroundColor: "#ffb07d",
   },
   buttonText: {
     color: "#fff",
@@ -341,19 +557,4 @@ const styles = StyleSheet.create({
     marginTop: 50,
     marginBottom: 20,
   },
-  // profileImage: {
-  //   width: 120,
-  //   height: 120,
-  //   borderRadius: 60,
-  //   alignSelf: "center",
-  //   marginTop: 20,
-  //   marginBottom: 10,
-  //   borderWidth: 3,
-  //   borderColor: "#fff",
-  //   shadowColor: "#000",
-  //   shadowOffset: { width: 0, height: 2 },
-  //   shadowOpacity: 0.2,
-  //   shadowRadius: 4,
-  //   elevation: 3,
-  // },
 });

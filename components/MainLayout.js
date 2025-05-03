@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import BottomTabNavigator from "./BottomTabNavigator";
-//NOTE-THIS IS THE HAMBURGER MENU AND BOTTOM TAB NAVIGATOR THAT REMAINS ON EVERY PAGE
+//NOTE-THIS IS THE HAMBURGER MENU AND BOTTOM TAB NAVIGATOR THAT REMAINS ON EVERY PAGE 
 
 const MainLayout = ({ navigation, children }) => {
   return (
@@ -27,8 +27,8 @@ const MainLayout = ({ navigation, children }) => {
 
 const styles = StyleSheet.create({
   upper: {
-    height: 5,
-    backgroundColor: "#ffffff",
+    height: 35,
+    backgroundColor: "#f76a06",
   },
   header: {
     flexDirection: "row",
@@ -43,7 +43,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "bold",
     color: "#f76a06",
-    marginTop: 20,
   },
 });
 

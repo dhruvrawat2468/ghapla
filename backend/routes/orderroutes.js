@@ -187,7 +187,7 @@ const newOrder = async (req, res) => {
 // Order Routes
 router.post("/create", newOrder);
 router.get("/user/:userId", getOrdersByUser);
-router.get("/technician/:technicianId", async (req, res) => {
+router.get("/technician/:technicianId",async (req, res) => {
   try {
     const { technicianId } = req.params;
 

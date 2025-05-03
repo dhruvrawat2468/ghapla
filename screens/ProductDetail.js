@@ -43,7 +43,7 @@ export default function ProductDetailsScreen() {
         setLoading(false);
       } else {
         try {
-          const response = await fetch("http://192.168.1.8:7000/api/devices/all");
+          const response = await fetch("http://192.168.1.6:7000/api/devices/all");
           if (!response.ok) throw new Error("Failed to fetch devices");
           const devices = await response.json();
           const matchingDevices = devices.filter(
@@ -135,7 +135,7 @@ export default function ProductDetailsScreen() {
         const type = match ? `image/${match[1]}` : "image/jpeg";
         formData.append("file", { uri: image, name: filename, type });
 
-        const response = await fetch("http://192.168.1.8:7000/api/image/upload", {
+        const response = await fetch("http://192.168.1.6:7000/api/image/upload", {
           method: "POST",
           body: formData,
         });

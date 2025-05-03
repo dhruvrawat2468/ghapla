@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import axios from "axios";
+import API from "../utils/api";
 import { AuthContext } from "../context/AuthContext";
 
 const OrderTrackingScreen = () => {
@@ -23,35 +23,37 @@ const OrderTrackingScreen = () => {
   useEffect(() => {
     const fetchOrdersAndStatuses = async () => {
       if (!userProfile?._id || !userToken) {
+        console.warn("No userProfile or userToken available");
         setLoading(false);
         return;
       }
 
       try {
         // Fetch orders
-        const ordersResponse = await axios.get(
-          `http://192.168.1.8:7000/api/orders/user/${userProfile._id}`,
-          {
-            headers: { Authorization: `Bearer ${userToken}` },
-          }
-        );
+        console.log(`Fetching orders for userId: ${userProfile._id}`);
+        const ordersResponse = await API.get(`/api/orders/user/${userProfile._id}`, {
+          headers: { Authorization: `Bearer ${userToken}` },
+        });
+
+        if (!ordersResponse.data || ordersResponse.data.length === 0) {
+          console.log("No orders found for user");
+          setOrders([]);
+          setLoading(false);
+          return;
+        }
 
         // Fetch OrderStatus for each order
         const statusPromises = ordersResponse.data.map((order) =>
-          axios
-            .get(
-              `http://192.168.1.8:7000/api/orders/order-status/${order._id}`,
-              {
-                headers: { Authorization: `Bearer ${userToken}` },
-              }
-            )
-            .catch((error) => {
-              if (error.response?.status === 404) {
-                console.warn(`OrderStatus not found for orderId: ${order._id}`);
-                return { data: null };
-              }
-              throw error;
-            })
+          API.get(`/api/orders/order-status/${order._id}`, {
+            headers: { Authorization: `Bearer ${userToken}` },
+          }).catch((error) => {
+            if (error.response?.status === 404) {
+              console.warn(`OrderStatus not found for orderId: ${order._id}`);
+              return { data: null };
+            }
+            console.error(`Error fetching status for orderId: ${order._id}`, error.response?.data || error.message);
+            throw error;
+          })
         );
 
         const statusesResponses = await Promise.all(statusPromises);
@@ -60,7 +62,7 @@ const OrderTrackingScreen = () => {
         const statusMap = {};
         statusesResponses.forEach((response, index) => {
           const orderId = ordersResponse.data[index]._id;
-          statusMap[orderId] = response.data?.status || "unknown";
+          statusMap[orderId] = response.data?.status || "unaccepted";
         });
 
         // Map orders with their OrderStatus.status and serviceType
@@ -73,16 +75,26 @@ const OrderTrackingScreen = () => {
             year: "2-digit",
           }).replace(/\//g, "-"),
           status: statusMap[order._id],
-          serviceType: order.serviceType,
+          serviceType: order.type, // Changed from serviceType to type to match Order schema
         }));
 
+        console.log("Mapped orders:", mappedOrders);
         setOrders(mappedOrders);
       } catch (error) {
         console.error("Error fetching orders or statuses:", {
           message: error.message,
+          code: error.code,
           response: error.response?.data,
         });
-        Alert.alert("Error", "Failed to load orders. Please try again.");
+        let errorMessage = "Failed to load orders. Please try again.";
+        if (error.code === "ERR_NETWORK") {
+          errorMessage = "Network error: Unable to reach the server. Please check your network.";
+        } else if (error.response?.status === 401 || error.response?.status === 403) {
+          errorMessage = "Authentication failed. Please log in again.";
+        } else if (error.response?.status === 404) {
+          errorMessage = "No orders found for this user.";
+        }
+        Alert.alert("Error", errorMessage);
       } finally {
         setLoading(false);
       }

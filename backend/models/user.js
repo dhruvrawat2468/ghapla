@@ -1,7 +1,7 @@
 import mongoose from "mongoose"
 
 const addressSchema = new mongoose.Schema({
-  address: { type: String, required: true },
+  street: { type: String, required: true },
   landmark: { type: String, required: true },
   pincode: { type: String, required: true },
   houseNumber: { type: String, required: true },
@@ -16,6 +16,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   address: { type: [addressSchema], required: true }, // Array of address objects
   age: { type: Number, required: true },
+  mobile: { type: String, required: true },
   gender: { type: String, required: true, enum: ["male", "female", "other"] },
   role: { type: String, required: true, enum: ["tech", "cust", "admin"], default: "cust" }
 });

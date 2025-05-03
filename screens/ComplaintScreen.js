@@ -56,7 +56,7 @@ const ComplaintScreen = () => {
       console.log("Submitting complaint:", complaintData);
 
       const response = await axios.post(
-        "http://192.168.1.8:7000/api/complaints",
+        "http://192.168.1.6:7000/api/complaints",
         complaintData,
         {
           headers: { Authorization: `Bearer ${userToken}`, "Content-Type": "application/json" },

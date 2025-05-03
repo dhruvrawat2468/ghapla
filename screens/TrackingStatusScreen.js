@@ -6,12 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   Animated,
+  Dimensions,
   Modal,
-  TouchableWithoutFeedback,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Card, RadioButton } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const TrackingStatusScreen = ({ route }) => {
   const { orderId } = route.params || {};
@@ -19,9 +21,12 @@ const TrackingStatusScreen = ({ route }) => {
   const [paymentMethod, setPaymentMethod] = useState(null);
   const [isCostModalVisible, setCostModalVisible] = useState(false);
   const [orderDetails, setOrderDetails] = useState(null);
-  const statuses = ["Arrived", "Cost Verification", "Repair in Progress", "Ready to Deliver"];
+  const backendStatuses = ["Arrived", "Cost Verification", "Repair in Progress", "Ready to Deliver"];
+  const displayStatuses = ["Arrived", "verification", "repair", "payment"];
+  const LINE_HEIGHT = SCREEN_HEIGHT * 0.12;
+  const TOTAL_LINE_HEIGHT = LINE_HEIGHT * (displayStatuses.length - 1);
   const animatedLines = useRef(
-    Array(statuses.length - 1)
+    Array(displayStatuses.length - 1)
       .fill()
       .map(() => new Animated.Value(0))
   ).current;
@@ -29,7 +34,7 @@ const TrackingStatusScreen = ({ route }) => {
   useEffect(() => {
     const fetchOrderDetails = async () => {
       try {
-        const response = await fetch(`http://192.168.251.1:7000/api/orders/order-status/${orderId}`, {
+        const response = await fetch(`http://192.168.1.6:7000/api/orders/order-status/${orderId}`, {
           method: "GET",
           headers: { "Content-Type": "application/json" },
         });
@@ -40,9 +45,10 @@ const TrackingStatusScreen = ({ route }) => {
         if (data) {
           setOrderDetails(data);
           const currentStatus = data.status;
-          if (statuses.includes(currentStatus)) {
-            setStatus(currentStatus);
-            const currentIndex = statuses.indexOf(currentStatus);
+          if (backendStatuses.includes(currentStatus)) {
+            const displayStatus = displayStatuses[backendStatuses.indexOf(currentStatus)];
+            setStatus(displayStatus);
+            const currentIndex = displayStatuses.indexOf(displayStatus);
             animatedLines.forEach((animValue, index) => {
               Animated.timing(animValue, {
                 toValue: index < currentIndex ? 1 : 0,
@@ -72,7 +78,7 @@ const TrackingStatusScreen = ({ route }) => {
 
   const handleAcceptCost = async () => {
     try {
-      const response = await fetch(`http://192.168.251.1:7000/api/orders/order-status/accept-cost`, {
+      const response = await fetch(`http://192.168.1.6:7000/api/orders/order-status/accept-cost`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId }),
@@ -80,9 +86,9 @@ const TrackingStatusScreen = ({ route }) => {
       if (response.ok) {
         const updatedStatus = await response.json();
         setOrderDetails(updatedStatus.orderStatus);
-        setStatus("Repair in Progress");
+        setStatus("repair");
         setCostModalVisible(false);
-        const currentIndex = statuses.indexOf("Cost Verification");
+        const currentIndex = displayStatuses.indexOf("verification");
         Animated.timing(animatedLines[currentIndex], {
           toValue: 1,
           duration: 1000,
@@ -96,7 +102,7 @@ const TrackingStatusScreen = ({ route }) => {
 
   const handleRejectCost = async () => {
     try {
-      const response = await fetch(`http://192.168.251.1:7000/api/orders/order-status/reject-cost`, {
+      const response = await fetch(`http://192.168.1.6:7000/api/orders/order-status/reject-cost`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId }),
@@ -115,7 +121,7 @@ const TrackingStatusScreen = ({ route }) => {
   const handlePayment = async () => {
     if (!paymentMethod) return;
     try {
-      const response = await fetch(`http://192.168.251.1:7000/api/orders/order-status/update`, {
+      const response = await fetch(`http://192.168.1.6:7000/api/orders/order-status/update`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -127,9 +133,9 @@ const TrackingStatusScreen = ({ route }) => {
       if (response.ok) {
         const updatedStatus = await response.json();
         setOrderDetails(updatedStatus.orderStatus);
-        setStatus("Ready to Deliver");
+        setStatus("payment");
         alert(`Payment method selected: ${paymentMethod}`);
-        const currentIndex = statuses.indexOf("Repair in Progress");
+        const currentIndex = displayStatuses.indexOf("repair");
         Animated.timing(animatedLines[currentIndex], {
           toValue: 1,
           duration: 1000,
@@ -143,7 +149,7 @@ const TrackingStatusScreen = ({ route }) => {
 
   if (!status) {
     return (
-      <LinearGradient colors={["#FFB75E", "#ED8F03"]} style={styles.gradientContainer}>
+      <LinearGradient colors={["#FFf", "#fff"]} style={styles.gradientContainer}>
         <View style={styles.container}>
           <Card style={styles.cardContainer}>
             <Text style={styles.heading}>Tracking Status</Text>
@@ -156,14 +162,14 @@ const TrackingStatusScreen = ({ route }) => {
   }
 
   return (
-    <LinearGradient colors={["#FFB75E", "#ED8F03"]} style={styles.gradientContainer}>
+    <LinearGradient colors={["#FFf", "#fff"]} style={styles.gradientContainer}>
       <ScrollView contentContainerStyle={styles.container}>
         <Card style={styles.cardContainer}>
           <Text style={styles.heading}>Tracking Status</Text>
           <View style={styles.divider} />
           <View style={styles.timeline}>
-            <View style={styles.backgroundLine} />
-            <Animated.View style={styles.foregroundLineContainer}>
+            <View style={[styles.backgroundLine, { height: TOTAL_LINE_HEIGHT }]} />
+            <Animated.View style={[styles.foregroundLineContainer, { height: TOTAL_LINE_HEIGHT }]}>
               {animatedLines.map((animValue, index) => (
                 <Animated.View
                   key={index}
@@ -172,46 +178,56 @@ const TrackingStatusScreen = ({ route }) => {
                     {
                       height: animValue.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [0, 60],
+                        outputRange: [0, LINE_HEIGHT],
                       }),
                     },
                   ]}
                 />
               ))}
             </Animated.View>
-            {statuses.map((step) => (
-              <View key={step} style={styles.step}>
-                <View style={styles.iconContainer}>
+            {displayStatuses.map((step, index) => (
+              <View key={step} style={[styles.step, { tinglingHeight: LINE_HEIGHT }]}>
+                <View
+                  style={[
+                    styles.iconContainer,
+                    index <= displayStatuses.indexOf(status) && styles.activeIcon,
+                  ]}
+                >
                   <MaterialIcons
                     name={
                       step === "Arrived"
                         ? "directions-bike"
-                        : step === "Cost Verification"
+                        : step === "verification"
                         ? "attach-money"
-                        : step === "Repair in Progress"
+                        : step === "repair"
                         ? "build"
-                        : "payment"
+                        : "currency-rupee"
                     }
                     size={24}
                     color="white"
                   />
                 </View>
                 <View style={styles.stepContent}>
-                  <Text style={styles.stepTitle}>
+                  <Text
+                    style={[
+                      styles.stepTitle,
+                      index <= displayStatuses.indexOf(status) && styles.activeTitle,
+                    ]}
+                  >
                     {step === "Arrived"
                       ? "Technician Arrived"
-                      : step === "Cost Verification"
+                      : step === "verification"
                       ? "Cost Verification"
-                      : step === "Repair in Progress"
+                      : step === "repair"
                       ? "Repair In Process"
                       : "Payment Done"}
                   </Text>
                   <Text style={styles.stepDescription}>
                     {step === "Arrived"
                       ? "Technician is at your doorstep, ready to assist you."
-                      : step === "Cost Verification"
-                      ? "Please verify the repair cost before we proceed."
-                      : step === "Repair in Progress"
+                      : step === "verification"
+                      ? "Customer will verify the cost before repairing process."
+                      : step === "repair"
                       ? "Your product is being repaired by experts. Sit back & chill!"
                       : "Payment has been successfully completed."}
                   </Text>
@@ -223,19 +239,20 @@ const TrackingStatusScreen = ({ route }) => {
         <Card style={styles.billCard}>
           <Text style={styles.billTitle}>Bill Details</Text>
           <View style={styles.divider} />
-          <View style={styles.billItemRow}>
-            <Text style={styles.billItem}>Service Charge:</Text>
-            <Text style={styles.billAmount}>₹{orderDetails?.serviceCharge || 0}</Text>
-          </View>
+         
           <View style={styles.billItemRow}>
             <Text style={styles.billItem}>Repair Cost:</Text>
             <Text style={styles.billAmount}>₹{orderDetails?.cost || 0}</Text>
+          </View>
+          <View style={styles.billItemRow}>
+            <Text style={styles.billItem}>Discount:</Text>
+            <Text style={styles.discount}>-₹{orderDetails?.discount || 0}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.billItemRow}>
             <Text style={styles.grandTotal}>Grand Total:</Text>
             <Text style={styles.grandTotalAmount}>
-              ₹{(orderDetails?.serviceCharge || 0) + (orderDetails?.cost || 0)}
+              ₹{(orderDetails?.serviceCharge || 0) + (orderDetails?.cost || 0) - (orderDetails?.discount || 0)}
             </Text>
           </View>
         </Card>
@@ -264,49 +281,54 @@ const TrackingStatusScreen = ({ route }) => {
             <Text style={styles.paymentButtonText}>Proceed to Payment</Text>
           </TouchableOpacity>
         </Card>
-        <Modal
-          visible={isCostModalVisible}
-          animationType="fade"
-          transparent={true}
-          onRequestClose={() => setCostModalVisible(false)}
-        >
-          <TouchableWithoutFeedback onPress={() => setCostModalVisible(false)}>
-            <View style={styles.modalBackdrop}>
-              <View style={styles.costModalContainer}>
-                <Text style={styles.modalTitle}>Cost Verification</Text>
+        <Modal visible={isCostModalVisible} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <Text style={styles.modalTitle}>Cost Estimate Verification</Text>
+              <View style={styles.modalDivider} />
+              <View style={styles.costDetailContainer}>
                 {orderDetails?.repairDetails?.length > 0 ? (
                   orderDetails.repairDetails.map((entry, index) => (
-                    <View key={index} style={styles.entryContainer}>
-                      <Text style={styles.modalText}>
-                        {entry.whatRepaired}: ₹{entry.cost}
+                    <View key={index} style={styles.costDetailRow}>
+                      <Text style={styles.costDetailLabel}>
+                        {entry.whatRepaired || "Parts to replace"}:
                       </Text>
-                      {index < orderDetails.repairDetails.length - 1 && (
-                        <View style={styles.separator} />
-                      )}
+                      <Text style={styles.costDetailValue}>₹{entry.cost}</Text>
                     </View>
                   ))
                 ) : (
-                  <Text style={styles.modalText}>No repair details available</Text>
+                  <View style={styles.costDetailRow}>
+                    <Text style={styles.costDetailLabel}>No repair details:</Text>
+                    <Text style={styles.costDetailValue}>N/A</Text>
+                  </View>
                 )}
-                <Text style={styles.modalText}>Service Charge: ₹{orderDetails?.serviceCharge || 0}</Text>
-                <Text style={styles.modalText}>Repair Cost: ₹{orderDetails?.cost || 0}</Text>
-                <Text style={styles.modalText}>
-                  Grand Total: ₹{(orderDetails?.serviceCharge || 0) + (orderDetails?.cost || 0)}
-                </Text>
-                <View style={styles.buttonContainer}>
-                  <TouchableOpacity style={styles.modalButton} onPress={handleAcceptCost}>
-                    <Text style={styles.modalButtonText}>Accept</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.rejectButton]}
-                    onPress={handleRejectCost}
-                  >
-                    <Text style={styles.modalButtonText}>Reject</Text>
-                  </TouchableOpacity>
+                <View style={styles.costDetailRow}>
+                  <Text style={styles.costDetailLabel}>Service Charge:</Text>
+                  <Text style={styles.costDetailValue}>₹{orderDetails?.serviceCharge || 0}</Text>
+                </View>
+                <View style={styles.costTotalRow}>
+                  <Text style={styles.costTotalLabel}>Total Estimated Cost:</Text>
+                  <Text style={styles.costTotalValue}>
+                    ₹{(orderDetails?.serviceCharge || 0) + (orderDetails?.cost || 0)}
+                  </Text>
                 </View>
               </View>
+              <View style={styles.modalButtonContainer}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.declineButton]}
+                  onPress={handleRejectCost}
+                >
+                  <Text style={styles.modalButtonText}>Decline</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.acceptButton]}
+                  onPress={handleAcceptCost}
+                >
+                  <Text style={styles.modalButtonText}>Accept</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </TouchableWithoutFeedback>
+          </View>
         </Modal>
       </ScrollView>
     </LinearGradient>
@@ -314,13 +336,8 @@ const TrackingStatusScreen = ({ route }) => {
 };
 
 const styles = StyleSheet.create({
-  gradientContainer: {
-    flex: 1,
-  },
-  container: {
-    flexGrow: 1,
-    padding: 16,
-  },
+  gradientContainer: { flex: 1 },
+  container: { flexGrow: 1, padding: 16 },
   cardContainer: {
     padding: 16,
     borderRadius: 10,
@@ -344,24 +361,29 @@ const styles = StyleSheet.create({
   timeline: {
     marginLeft: 20,
     position: "relative",
+    paddingBottom: 10,
   },
   step: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginBottom: 20,
+    marginBottom: 0,
   },
   iconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "orange",
+    backgroundColor: "#ccc",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
     zIndex: 1,
   },
+  activeIcon: {
+    backgroundColor: "#fd7e14",
+  },
   stepContent: {
     flex: 1,
+    paddingBottom: 20,
   },
   stepTitle: {
     fontSize: 20,
@@ -369,15 +391,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     color: "#585858",
   },
+  activeTitle: {
+    color: "#fd7e14",
+  },
   stepDescription: {
     fontSize: 14,
     color: "gray",
+    marginRight: 10,
   },
   backgroundLine: {
     position: "absolute",
     left: 18,
     top: 20,
-    height: 250,
     width: 4,
     backgroundColor: "#ccc",
   },
@@ -385,11 +410,17 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 18,
     top: 20,
+    width: 4,
   },
   foregroundLineSegment: {
     width: 4,
-    backgroundColor: "orange",
-    marginBottom: 20,
+    backgroundColor: "#fd7e14",
+    marginBottom: 0,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#ccc",
+    marginVertical: 10,
   },
   billCard: {
     marginTop: 20,
@@ -404,7 +435,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: "#575757",
   },
-  bill NeItemRow: {
+  billItemRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 8,
@@ -418,6 +449,11 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#565656",
   },
+  discount: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "red",
+  },
   grandTotal: {
     fontSize: 16,
     fontWeight: "bold",
@@ -426,7 +462,7 @@ const styles = StyleSheet.create({
   grandTotalAmount: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "orange",
+    color: "#fd7e14",
   },
   paymentCard: {
     marginTop: 20,
@@ -434,6 +470,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     elevation: 3,
     backgroundColor: "#fff",
+    marginBottom: 35,
   },
   paymentTitle: {
     fontSize: 22,
@@ -449,10 +486,11 @@ const styles = StyleSheet.create({
   radioText: {
     fontSize: 16,
     color: "#555555",
+    marginLeft: 8,
   },
   paymentButton: {
     marginTop: 20,
-    backgroundColor: "orange",
+    backgroundColor: "#fd7e14",
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: "center",
@@ -465,81 +503,87 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: "#ccc",
   },
-  divider: {
-    height: 1,
-    backgroundColor: "#ccc",
-    marginVertical: 10,
-  },
-  modalBackdrop: {
+  modalOverlay: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
-  costModalContainer: {
-    backgroundColor: "#fff5e6",
-    padding: 25,
-    borderRadius: 20,
-    alignItems: "center",
+  modalContainer: {
     width: "85%",
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    borderColor: "#ff7f00",
-    borderWidth: 2,
-  },
-  modalTitle: {
-    fontSize: 24,
-    marginBottom: 20,
-    textAlign: "center",
-    color: "#000",
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-  modalText: {
-    fontSize: 18,
-    marginBottom: 10,
-    textAlign: "center",
-    color: "#333",
-    fontWeight: "500",
-  },
-  entryContainer: {
-    width: "100%",
-    marginBottom: 15,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: "#ff7f00",
-    width: "80%",
-    alignSelf: "center",
-    marginVertical: 10,
-  },
-  buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    width: "100%",
-    marginTop: 15,
-  },
-  modalButton: {
-    backgroundColor: "#ff7f00",
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 20,
     elevation: 5,
   },
-  rejectButton: {
-    backgroundColor: "#d9534f",
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#fd7e14",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: "#e0e0e0",
+    marginVertical: 10,
+  },
+  costDetailContainer: {
+    marginVertical: 10,
+  },
+  costDetailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  costDetailLabel: {
+    fontSize: 16,
+    color: "#555",
+    fontWeight: "600",
+  },
+  costDetailValue: {
+    fontSize: 16,
+    color: "#333",
+  },
+  costTotalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 15,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#e0e0e0",
+  },
+  costTotalLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#555",
+  },
+  costTotalValue: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#fd7e14",
+  },
+  modalButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 6,
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  declineButton: {
+    backgroundColor: "#dc3545",
+  },
+  acceptButton: {
+    backgroundColor: "#28a745",
   },
   modalButtonText: {
-    color: "#fff",
-    fontWeight: "700",
+    color: "white",
+    fontWeight: "bold",
     fontSize: 16,
   },
 });

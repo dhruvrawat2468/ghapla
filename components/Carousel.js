@@ -8,6 +8,7 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  Animated as RNAnimated,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import {
@@ -21,12 +22,13 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
+  FadeIn,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import Geocoder from "react-native-geocoding";
 import MapView, { Marker } from "react-native-maps";
-import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
+import { MaterialIcons, FontAwesome5, Ionicons } from "@expo/vector-icons";
 import { AuthContext } from "../context/AuthContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -39,6 +41,103 @@ const timeSlotMapping = {
   "1 PM - 4 PM": { from: "13:00", to: "16:00" },
   "4 PM - 7 PM": { from: "16:00", to: "19:00" },
   "7 PM - 10 PM": { from: "19:00", to: "22:00" },
+};
+
+// Service mode descriptions
+const serviceModeInfo = {
+  "Home Repair": 
+    "Our technician will visit your location to repair your appliance on-site. Best for fixed appliances or minor issues.",
+  "Pickup Repair Drop": 
+    "We'll collect your appliance, repair it at our service center, and return it to you. Ideal for complex repairs requiring specialized tools."
+};
+
+const InfoDialog = ({ visible, message, onClose }) => {
+  if (!visible) return null;
+  
+  return (
+    <Animated.View 
+      entering={FadeIn.duration(300)}
+      style={styles.infoDialogContainer}
+    >
+      <View style={styles.infoDialog}>
+        <View style={styles.infoDialogHeader}>
+          <Ionicons name="information-circle" size={22} color="#FF6D00" />
+          <Text style={styles.infoDialogTitle}>Service Information</Text>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Ionicons name="close" size={20} color="#757575" />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.infoDialogMessage}>{message}</Text>
+      </View>
+    </Animated.View>
+  );
+};
+
+const ServiceModeButton = ({ mode, selected, onPress, onLongPress }) => {
+  const scale = useSharedValue(1);
+  
+  const handlePressIn = () => {
+    scale.value = withSpring(0.95);
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1);
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const getIcon = () => {
+    switch(mode) {
+      case "Home Repair":
+        return <MaterialIcons name="home-repair-service" size={24} color={selected ? "#FFFFFF" : "#FF6D00"} />;
+      case "Pickup Repair Drop":
+        return <MaterialIcons name="local-shipping" size={24} color={selected ? "#FFFFFF" : "#FF6D00"} />;
+      default:
+        return <MaterialIcons name="miscellaneous-services" size={24} color={selected ? "#FFFFFF" : "#FF6D00"} />;
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+    >
+      <Animated.View 
+        style={[
+          styles.serviceModeButton,
+          selected ? styles.serviceModeButtonSelected : {},
+          animatedStyle
+        ]}
+      >
+        <LinearGradient
+          colors={selected ? ["#FF6D00", "#FF3D00"] : ["#FFF3E0", "#FFF3E0"]}
+          style={styles.serviceModeButtonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          {getIcon()}
+          <Text 
+            style={[
+              styles.serviceModeButtonText,
+              selected ? styles.serviceModeButtonTextSelected : {}
+            ]}
+          >
+            {mode}
+          </Text>
+          {selected && (
+            <View style={styles.selectedCheck}>
+              <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+            </View>
+          )}
+        </LinearGradient>
+      </Animated.View>
+    </TouchableOpacity>
+  );
 };
 
 const CarouselScreen = () => {
@@ -54,6 +153,8 @@ const CarouselScreen = () => {
   const [loadingGPS, setLoadingGPS] = useState(false);
   const [region, setRegion] = useState(null);
   const [selectedMode, setSelectedMode] = useState(null);
+  const [infoVisible, setInfoVisible] = useState(false);
+  const [infoMessage, setInfoMessage] = useState("");
 
   const [isFocused, setIsFocused] = useState({
     address: false,
@@ -170,6 +271,19 @@ const CarouselScreen = () => {
     setPincode(text.replace(/[^0-9]/g, ""));
   };
 
+  const handleSelectMode = (mode) => {
+    setSelectedMode(mode);
+  };
+
+  const handleShowInfo = (mode) => {
+    setInfoMessage(serviceModeInfo[mode]);
+    setInfoVisible(true);
+  };
+
+  const handleCloseInfo = () => {
+    setInfoVisible(false);
+  };
+
   const handleSubmit = async () => {
     if (!userProfile || !userProfile._id) {
       Alert.alert("Authentication Required", "Please log in to place an order.");
@@ -227,7 +341,7 @@ const CarouselScreen = () => {
     }
 
     try {
-      const response = await fetch("http://192.168.1.8:7000/api/orders/create", {
+      const response = await fetch("http://192.168.1.6:7000/api/orders/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderData),
@@ -264,31 +378,45 @@ const CarouselScreen = () => {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
         <Animated.View entering={FadeInDown.delay(400)} style={[styles.formContainer, formAnimatedStyle]}>
-          <View style={styles.serviceMode}>
-            <MaterialIcons name="miscellaneous-services" size={20} color="#FF6D00" />
-            {categories.length === 1 ? (
-              <Text style={styles.serviceModeText}>{categories[0]}</Text>
-            ) : (
-              <View style={styles.categoryButtonsWrapper}>
-                {categories.map((cat, index) => {
-                  const isSelected = selectedMode === cat;
-                  return (
-                    <TouchableOpacity
-                      key={index}
-                      style={[styles.categoryButton, isSelected && styles.categoryButtonSelected]}
-                      onPress={() => setSelectedMode(cat)}
-                    >
-                      <Text
-                        style={[styles.categoryButtonText, isSelected && styles.categoryButtonTextSelected]}
-                      >
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+          <InfoDialog 
+            visible={infoVisible} 
+            message={infoMessage} 
+            onClose={handleCloseInfo} 
+          />
+          
+          <Text style={styles.sectionHeader}>Select Service Mode</Text>
+          <Text style={styles.sectionSubheader}>Choose how you want your service to be performed</Text>
+          
+          {categories.length === 1 ? (
+            <View style={styles.singleServiceMode}>
+              <View style={styles.serviceInfoBadge}>
+                <MaterialIcons name="miscellaneous-services" size={20} color="#FF6D00" />
+                <Text style={styles.serviceModeText}>{categories[0]}</Text>
               </View>
-            )}
+              <TouchableOpacity onPress={() => handleShowInfo(categories[0])}>
+                <Ionicons name="information-circle-outline" size={22} color="#9E9E9E" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.serviceModesContainer}>
+              {categories.map((mode, index) => (
+                <ServiceModeButton 
+                  key={index}
+                  mode={mode}
+                  selected={selectedMode === mode}
+                  onPress={() => handleSelectMode(mode)}
+                  onLongPress={() => handleShowInfo(mode)}
+                />
+              ))}
+            </View>
+          )}
+          
+          <View style={styles.tipContainer}>
+            <Ionicons name="bulb-outline" size={18} color="#FF6D00" />
+            <Text style={styles.tipText}>Tap and hold a service mode to learn more about it</Text>
           </View>
+
+          <View style={styles.divider} />
 
           <Text style={styles.sectionHeader}>Service Address</Text>
 
@@ -421,38 +549,6 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     paddingHorizontal: 20,
   },
-  categoryButtonsWrapper: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginLeft: 10,
-    justifyContent: "center",
-  },
-  categoryButton: {
-    backgroundColor: "#FFE0B2",
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#FF6D00",
-    width: (SCREEN_WIDTH - 64) / 2,
-    alignItems: "center",
-  },
-  categoryButtonSelected: {
-    backgroundColor: "#FF6D00",
-  },
-  categoryButtonText: {
-    color: "#FF6D00",
-    fontWeight: "700",
-    fontSize: 13,
-    fontFamily: "Oswald_400Regular",
-    textAlign: "center",
-    numberOfLines: 1,
-    ellipsizeMode: "tail",
-  },
-  categoryButtonTextSelected: {
-    color: "#FFFFFF",
-  },
   formContainer: {
     width: "100%",
     backgroundColor: "#FFFFFF",
@@ -464,27 +560,102 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  serviceMode: {
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#424242",
+    marginBottom: 4,
+    fontFamily: "Oswald_700Bold",
+  },
+  sectionSubheader: {
+    fontSize: 14,
+    color: "#757575",
+    marginBottom: 16,
+    fontFamily: "Oswald_400Regular",
+  },
+  serviceModesContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  serviceModeButton: {
+    width: (SCREEN_WIDTH - 68) / 2,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#FFE0B2",
+    shadowColor: "#FF6D00",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  serviceModeButtonSelected: {
+    borderColor: "#FF6D00",
+    shadowOpacity: 0.2,
+    elevation: 3,
+  },
+  serviceModeButtonGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 100,
+    position: "relative",
+  },
+  serviceModeButtonText: {
+    color: "#FF6D00",
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 8,
+    textAlign: "center",
+    fontFamily: "Oswald_700Bold",
+  },
+  serviceModeButtonTextSelected: {
+    color: "#FFFFFF",
+  },
+  selectedCheck: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+  },
+  singleServiceMode: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: "#FFF3E0",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 24,
-    justifyContent: "center",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  serviceInfoBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  tipContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF8F0",
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  tipText: {
+    fontSize: 12,
+    color: "#757575",
+    marginLeft: 8,
+    fontFamily: "Oswald_400Regular",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#E0E0E0",
+    marginVertical: 16,
   },
   serviceModeText: {
     fontSize: 14,
     color: "#FF6D00",
     fontWeight: "800",
     marginLeft: 8,
-    fontFamily: "Sans-Serif",
-  },
-  sectionHeader: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#424242",
-    marginBottom: 16,
     fontFamily: "Oswald_700Bold",
   },
   inputContainer: {
@@ -570,6 +741,48 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "rgba(255, 61, 0, 0.3)",
     zIndex: -1,
+  },
+  infoDialogContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+  },
+  infoDialog: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#FFE0B2",
+  },
+  infoDialogHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  infoDialogTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#424242",
+    marginLeft: 8,
+    flex: 1,
+    fontFamily: "Oswald_700Bold",
+  },
+  closeButton: {
+    padding: 4,
+  },
+  infoDialogMessage: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#616161",
+    fontFamily: "Oswald_400Regular",
   },
 });
 

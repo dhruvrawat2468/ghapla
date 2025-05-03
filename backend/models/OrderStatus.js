@@ -1,31 +1,52 @@
 import mongoose from "mongoose";
 
 const orderStatusSchema = new mongoose.Schema({
-  orderId: { type: String, required: true, unique: true },
+  orderId: {
+    type: String,
+  },
   status: {
     type: String,
+    required: true,
     enum: [
       "unaccepted",
       "accepted",
-      "completed",
       "Arrived",
       "Cost Verification",
       "Repair in Progress",
-      "Ready to Deliver"
+      "Ready to Deliver",
+      "completed",
     ],
     default: "unaccepted",
-    required: true,
+  },
+  cost: {
+    type: Number,
+    default: 0,
+  },
+  serviceCharge: {
+    type: Number,
+    default: 0,
   },
   repairDetails: [
     {
-      whatRepaired: { type: String },
-      cost: { type: Number },
+      whatRepaired: { type: String, default: "" },
+      cost: { type: Number, default: 0 },
     },
   ],
-  cost: { type: Number, default: 0 },
-  paymentStatus: { type: String, enum: ["incomplete", "pending", "completed"], default: "incomplete" },
-  updatedAt: { type: Date, default: Date.now },
-}, { timestamps: true });
+  paymentStatus: {
+    type: String,
+    default: "incomplete",
+    enum: ["incomplete", "pending", "completed"],
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
 
-const OrderStatus = mongoose.model("OrderStatus", orderStatusSchema);
-export default OrderStatus;
+// Update updatedAt on save
+orderStatusSchema.pre("save", function (next) {
+  this.updatedAt = new Date();
+  next();
+});
+
+export default mongoose.model("OrderStatus", orderStatusSchema);

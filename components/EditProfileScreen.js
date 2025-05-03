@@ -21,6 +21,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { Picker } from "@react-native-picker/picker";
 
 const EditProfileScreen = ({ navigation }) => {
   const { userToken, userProfile, setUserProfile } = useContext(AuthContext);
@@ -30,7 +31,7 @@ const EditProfileScreen = ({ navigation }) => {
     name: "",
     email: "",
     gender: "",
-    address: "",
+    street: "",
     landmark: "",
     pincode: "",
     houseNumber: "",
@@ -44,7 +45,7 @@ const EditProfileScreen = ({ navigation }) => {
         name: userProfile.name || "",
         email: userProfile.email || "",
         gender: userProfile.gender || "",
-        address: userProfile.address?.[0]?.address || "",
+        street: userProfile.address?.[0]?.street || "",
         landmark: userProfile.address?.[0]?.landmark || "",
         pincode: userProfile.address?.[0]?.pincode || "",
         houseNumber: userProfile.address?.[0]?.houseNumber || "",
@@ -61,7 +62,7 @@ const EditProfileScreen = ({ navigation }) => {
       updatedData.name !== (userProfile.name || "") ||
       updatedData.email !== (userProfile.email || "") ||
       updatedData.gender !== (userProfile.gender || "") ||
-      updatedData.address !== (userProfile.address?.[0]?.address || "") ||
+      updatedData.street !== (userProfile.address?.[0]?.street || "") ||
       updatedData.landmark !== (userProfile.address?.[0]?.landmark || "") ||
       updatedData.pincode !== (userProfile.address?.[0]?.pincode || "") ||
       updatedData.houseNumber !== (userProfile.address?.[0]?.houseNumber || "") ||
@@ -70,13 +71,23 @@ const EditProfileScreen = ({ navigation }) => {
     );
   };
 
+  const validate = () => {
+    if (!updatedData.name) return "Name is required";
+    if (!updatedData.email || !updatedData.email.includes("@")) return "Invalid email format";
+    if (!["male", "female", "other"].includes(updatedData.gender)) return "Gender must be male, female, or other";
+    if (!updatedData.street) return "Street is required";
+    if (!updatedData.houseNumber) return "House number is required";
+    if (!updatedData.city) return "City is required";
+    if (!updatedData.pincode || !/^\d{6}$/.test(updatedData.pincode)) return "Pincode must be 6 digits";
+    const ageNum = parseInt(updatedData.age);
+    if (isNaN(ageNum) || ageNum < 1 || ageNum > 120) return "Age must be a number between 1 and 120";
+    return null;
+  };
+
   const handleSaveChanges = async () => {
-    if (!updatedData.email.includes("@")) {
-      Alert.alert("Error", "Invalid email format");
-      return;
-    }
-    if (isNaN(updatedData.age) || updatedData.age === "") {
-      Alert.alert("Error", "Age must be a number");
+    const validationError = validate();
+    if (validationError) {
+      Alert.alert("Error", validationError);
       return;
     }
 
@@ -87,7 +98,7 @@ const EditProfileScreen = ({ navigation }) => {
         email: updatedData.email,
         gender: updatedData.gender,
         address: [{
-          address: updatedData.address,
+          street: updatedData.street,
           landmark: updatedData.landmark,
           pincode: updatedData.pincode,
           houseNumber: updatedData.houseNumber,
@@ -97,7 +108,7 @@ const EditProfileScreen = ({ navigation }) => {
       };
       console.log("Sending payload:", payload);
       const response = await axios.put(
-        "http://192.168.1.8:7000/api/other/profile/edit",
+        "http://192.168.1.6:7000/api/other/profile/edit",
         payload,
         {
           headers: { Authorization: `Bearer ${userToken}` },
@@ -108,10 +119,18 @@ const EditProfileScreen = ({ navigation }) => {
       navigation.goBack();
     } catch (error) {
       console.error("Error updating profile:", error);
-      Alert.alert(
-        "Error",
-        error.response?.data?.message || "Failed to update profile. Server error occurred."
-      );
+      let errorMessage = "Failed to update profile. Server error occurred.";
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+        if (errorMessage.includes("duplicate key error") && errorMessage.includes("email")) {
+          errorMessage = "This email is already in use. Please use a different email.";
+        }
+      } else if (error.response?.data?.errors) {
+        errorMessage = Object.values(error.response.data.errors)
+          .map(err => err.message)
+          .join("\n");
+      }
+      Alert.alert("Error", errorMessage);
     } finally {
       setSaving(false);
     }
@@ -158,7 +177,7 @@ const EditProfileScreen = ({ navigation }) => {
           {/* Personal Info Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Personal Information</Text>
-            {["name", "email", "gender", "age"].map((field) => (
+            {["name", "email"].map((field) => (
               <View key={field} style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>
                   {field.charAt(0).toUpperCase() + field.slice(1)}
@@ -171,30 +190,12 @@ const EditProfileScreen = ({ navigation }) => {
                     placeholderTextColor="#999"
                     value={updatedData[field]}
                     onChangeText={(text) =>
-                      setUpdatedData({
-                        ...updatedData,
-                        [field]:
-                          field === "age" ? text.replace(/[^0-9]/g, "") : text.trimStart(),
-                      })
+                      setUpdatedData({ ...updatedData, [field]: text.trimStart() })
                     }
-                    keyboardType={
-                      field === "email"
-                        ? "email-address"
-                        : field === "age"
-                        ? "numeric"
-                        : "default"
-                    }
+                    keyboardType={field === "email" ? "email-address" : "default"}
                   />
                   <Ionicons
-                    name={
-                      field === "name"
-                        ? "person-outline"
-                        : field === "email"
-                        ? "mail-outline"
-                        : field === "gender"
-                        ? "transgender-outline"
-                        : "calendar-outline"
-                    }
+                    name={field === "name" ? "person-outline" : "mail-outline"}
                     size={20}
                     color="#FF8C00"
                     style={styles.inputIcon}
@@ -202,23 +203,71 @@ const EditProfileScreen = ({ navigation }) => {
                 </View>
               </View>
             ))}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Gender<Text style={styles.required}> *</Text>
+              </Text>
+              <View style={styles.inputWrapper}>
+                <Picker
+                  selectedValue={updatedData.gender}
+                  onValueChange={(value) =>
+                    setUpdatedData({ ...updatedData, gender: value })
+                  }
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select gender" value="" />
+                  <Picker.Item label="Male" value="male" />
+                  <Picker.Item label="Female" value="female" />
+                  <Picker.Item label="Other" value="other" />
+                </Picker>
+                <Ionicons
+                  name="transgender-outline"
+                  size={20}
+                  color="#FF8C00"
+                  style={styles.inputIcon}
+                />
+              </View>
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Age<Text style={styles.required}> *</Text>
+              </Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter age"
+                  placeholderTextColor="#999"
+                  value={updatedData.age}
+                  onChangeText={(text) =>
+                    setUpdatedData({ ...updatedData, age: text.replace(/[^0-9]/g, "") })
+                  }
+                  keyboardType="numeric"
+                />
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color="#FF8C00"
+                  style={styles.inputIcon}
+                />
+              </View>
+            </View>
           </View>
 
           {/* Address Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Address Information</Text>
-            {["address", "landmark", "pincode", "houseNumber", "city"].map((field) => (
+            {["houseNumber", "street", "landmark", "city", "pincode"].map((field) => (
               <View key={field} style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>
-                  {field.charAt(0).toUpperCase() + field.slice(1)}
-                  {["address", "houseNumber", "city", "pincode"].includes(field) && (
-                    <Text style={styles.required}> *</Text>
-                  )}
+                  {field === "houseNumber"
+                    ? "House Number"
+                    : field.charAt(0).toUpperCase() + field.slice(1)}
+                  {field !== "landmark" && <Text style={styles.required}> *</Text>}
                 </Text>
                 <View style={styles.inputWrapper}>
                   <TextInput
                     style={styles.input}
-                    placeholder={`Enter ${field}`}
+                    placeholder={`Enter ${field === "houseNumber" ? "house number" : field}`}
                     placeholderTextColor="#999"
                     value={updatedData[field]}
                     onChangeText={(text) =>
@@ -231,7 +280,7 @@ const EditProfileScreen = ({ navigation }) => {
                   />
                   <Ionicons
                     name={
-                      field === "address"
+                      field === "street"
                         ? "location-outline"
                         : field === "landmark"
                         ? "pin-outline"
@@ -378,6 +427,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     color: "#333",
+  },
+  picker: {
+    flex: 1,
+    height: 44,
+    backgroundColor: "#F8F8F8",
   },
   inputIcon: {
     marginLeft: 10,

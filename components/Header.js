@@ -14,7 +14,7 @@ const textCarousel = [
 
 // Image carousel corresponding to text messages
 const imageCarousel = [
-  require("../assets/images/1fridge.png"),
+  require("../assets/images/fridg.png"),
   require("../assets/images/1tv.png"),
   require("../assets/images/1phone.png"),
   require("../assets/images/1laptop.png"),

@@ -36,7 +36,7 @@ const SearchBar = ({ onSearchSelect }) => {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const response = await fetch("http://192.168.1.8:7000/api/devices/all");
+        const response = await fetch("http://192.168.1.6:7000/api/devices/all");
         const data = await response.json();
         if (data && Array.isArray(data)) {
           setDevices(data);
