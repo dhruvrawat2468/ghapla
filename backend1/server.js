@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import connectDB from "./config/db.js";
-import authRoutes from "./routes/authRoutes.js";
+import authRoutes from "./routes/technciianauthRoutes.js";
 import orderRoutes from "./routes/orderroutes.js"; // Rename for clarity
 import otpRoutes from "./routes/otpRoutes.js"; // New OTP routes file
 import imageRoutes from "./routes/imageRoutes.js"; // New image routes file
@@ -13,13 +13,7 @@ dotenv.config(); // Load environment variables
 
 const app = express();
 
-// CORS setup (allow multiple origins for flexibility)
-// app.use(
-//   cors({
-//     origin: ["http://192.168.1.8:8081","http://localhost:8081"], // Add your frontend origins
-//     credentials: true,
-//   })
-// );
+
 app.use(
   cors({
     origin: "*", // Allow all origins for testing
@@ -30,10 +24,7 @@ app.use(
 // Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-});
+
 
 // Multer setup for file uploads (memory storage for encryption)
 const upload = multer({ storage: multer.memoryStorage() });
