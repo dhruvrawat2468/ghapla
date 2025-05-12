@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   View,
   Text,
@@ -10,17 +10,30 @@ import {
   Image,
   ScrollView,
   TextInput,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { Card } from "react-native-paper";
-import { useNavigation } from '@react-navigation/native'; // Import navigation hook
+import { TechnicianContext } from "../context/TechnicianContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const TaskDetailScreen = ({ route }) => {
   const { task } = route.params;
+  const { technician } = useContext(TechnicianContext);
   const [status, setStatus] = useState(null);
   const [isModalVisible, setModalVisible] = useState(false);
-  const [repairEntries, setRepairEntries] = useState([{ whatRepaired: "", cost: "" }]);
-  const navigation = useNavigation(); // Initialize navigation
+  const [isCostModalVisible, setCostModalVisible] = useState(false);
+  const [isConfirmationModalVisible, setConfirmationModalVisible] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [repairCases, setRepairCases] = useState([
+    {
+      issueDiagnosed: "",
+      partsReplaced: "",
+      estimatedCost: "",
+    },
+  ]);
 
   const openMaps = () => {
     const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -33,8 +46,9 @@ const TaskDetailScreen = ({ route }) => {
     Linking.openURL(`tel:${task.phone}`);
   };
 
+  // Determine status flow based on service type
   const statuses =
-    task.serviceType === "Repair at Home"
+    task.serviceType === "Home Repair"
       ? ["Technician Arrived", "Cost Verification", "Repaired", "Payment Done"]
       : [
           "Product Picked",
@@ -45,16 +59,110 @@ const TaskDetailScreen = ({ route }) => {
         ];
 
   const handleStatusUpdate = (newStatus) => {
-    if (
-      !status ||
-      statuses.indexOf(newStatus) === statuses.indexOf(status) + 1
-    ) {
-      setStatus(newStatus);
-      if (newStatus === "Cost Verification") {
-        setModalVisible(true);
-      } else {
-        setModalVisible(true);
+    setPendingStatus(newStatus);
+
+    if (newStatus === "Cost Verification") {
+      setCostModalVisible(true);
+    } else {
+      // Show confirmation dialog for all other status updates
+      setConfirmationModalVisible(true);
+    }
+  };
+
+  const confirmStatusUpdate = () => {
+    setStatus(pendingStatus);
+    setModalVisible(true);
+    setConfirmationModalVisible(false);
+  };
+
+  const calculateFinalCost = (cost) => {
+    const baseCost = parseFloat(cost);
+    if (isNaN(baseCost)) return 0;
+
+    let hikePercentage = 0;
+    if (baseCost <= 2000) {
+      hikePercentage = 50;
+    } else if (baseCost <= 5000) {
+      hikePercentage = 30;
+    } else if (baseCost <= 10000) {
+      hikePercentage = 20;
+    } else {
+      hikePercentage = 12;
+    }
+
+    return baseCost + (baseCost * hikePercentage) / 100;
+  };
+
+  const handleCostSubmit = async () => {
+    // Validate all repair cases
+    for (const caseItem of repairCases) {
+      if (!caseItem.issueDiagnosed) {
+        Alert.alert("Required Field", "Please describe the diagnosed issue");
+        return;
       }
+      if (
+        !caseItem.estimatedCost ||
+        isNaN(parseFloat(caseItem.estimatedCost))
+      ) {
+        Alert.alert("Invalid Cost", "Please enter a valid cost amount");
+        return;
+      }
+    }
+
+    // Calculate total final cost
+    const totalFinalCost = repairCases.reduce((total, caseItem) => {
+      return total + calculateFinalCost(caseItem.estimatedCost);
+    }, 0);
+
+    // Format repair details for the API
+    const formattedRepairDetails = repairCases.map(item => ({
+      whatRepaired: item.issueDiagnosed,
+      cost: parseFloat(item.estimatedCost)
+    }));
+
+    try {
+      setIsSubmitting(true);
+
+      // Get the auth token
+      const token = await AsyncStorage.getItem('technicianToken');
+      if (!token) {
+        Alert.alert("Authentication Error", "Please log in again");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Send cost verification data to the backend
+      const response = await fetch('http://192.168.1.13:7000/api/orders/order-status/cost-verification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          orderId: task.orderId || task.id,
+          cost: totalFinalCost,
+          repairDetails: formattedRepairDetails
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update cost verification');
+      }
+
+      // Update local state
+      setStatus("Cost Verification");
+      setModalVisible(true);
+      setCostModalVisible(false);
+    } catch (error) {
+      console.error('Error submitting cost verification:', error);
+      Alert.alert(
+        "Error",
+        `Failed to submit cost verification: ${error.message}`,
+        [{ text: "OK" }]
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -62,53 +170,32 @@ const TaskDetailScreen = ({ route }) => {
     setModalVisible(false);
   };
 
-  const addRepairEntry = () => {
-    setRepairEntries([...repairEntries, { whatRepaired: "", cost: "" }]);
+  const addNewRepairCase = () => {
+    setRepairCases([
+      ...repairCases,
+      {
+        issueDiagnosed: "",
+        partsReplaced: "",
+        estimatedCost: "",
+      },
+    ]);
   };
 
-  const handleInputChange = (index, field, value) => {
-    const newEntries = [...repairEntries];
-    newEntries[index][field] = value;
-    setRepairEntries(newEntries);
+  const updateRepairCase = (index, field, value) => {
+    const newCases = [...repairCases];
+    newCases[index][field] = value;
+    setRepairCases(newCases);
   };
 
-  const saveToMongoDB = async () => {
-    const totalCost = repairEntries.reduce((sum, entry) => sum + (parseFloat(entry.cost) || 0), 0);
-    const payload = {
-      orderId: task.orderId,
-      cost: totalCost,
-      status: "Cost Verification",
-      repairDetails: repairEntries,
-    };
-    console.log("Sending payload to server:", payload);
-
-    try {
-      const response = await fetch('http://192.168.29.44:3001/api/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-      console.log("Server response:", result);
-      if (response.ok) {
-        console.log("Cost updated successfully:", result);
-        closeModal();
-      } else {
-        console.error("Failed to update cost:", result.message);
-      }
-    } catch (error) {
-      console.error("Error saving to MongoDB:", error.message);
-    }
-  };
-
-  // Function to navigate to TrackingStatusScreen
-  const navigateToTrackingStatus = () => {
-    navigation.navigate('TrackingStatus', { orderId: task.orderId });
+  const getTotalFinalCost = () => {
+    return repairCases.reduce((total, caseItem) => {
+      return total + calculateFinalCost(caseItem.estimatedCost);
+    }, 0);
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {/* Customer Info Card */}
       <Card style={styles.card}>
         <Card.Content>
           <View style={styles.header}>
@@ -121,22 +208,26 @@ const TaskDetailScreen = ({ route }) => {
               <FontAwesome name="phone" size={24} color="#fd7e14" />
             </TouchableOpacity>
           </View>
+
           <View style={styles.infoRow}>
             <MaterialIcons name="location-on" size={20} color="#ff7f00" />
             <Text style={styles.text}>{task.address}</Text>
           </View>
         </Card.Content>
       </Card>
+
+      {/* Navigation Button */}
       <TouchableOpacity style={styles.mapButton} onPress={openMaps}>
         <Text style={styles.buttonText}>📍 Navigate to Customer</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.trackingButton} onPress={navigateToTrackingStatus}>
-        <Text style={styles.buttonText}>🚚 View Tracking Status</Text>
-      </TouchableOpacity>
+
+      {/* Divider */}
       <Image
         source={require("../assets/images/di-Photoroom.png")}
         style={styles.imageDivider}
       />
+
+      {/* Status Update Section */}
       <Text style={styles.statusTitle}>Update Status</Text>
       {statuses.map((step, index) => (
         <Card
@@ -163,10 +254,18 @@ const TaskDetailScreen = ({ route }) => {
               ]}
             >
               {step}
+              {step === "Cost Verification" && repairCases.length > 0 && (
+                <Text style={styles.costText}>
+                  {" "}
+                  (₹{getTotalFinalCost().toFixed(2)})
+                </Text>
+              )}
             </Text>
           </TouchableOpacity>
         </Card>
       ))}
+
+      {/* Status Update Confirmation Modal */}
       <Modal
         visible={isModalVisible}
         animationType="fade"
@@ -175,47 +274,172 @@ const TaskDetailScreen = ({ route }) => {
       >
         <TouchableWithoutFeedback onPress={closeModal}>
           <View style={styles.modalBackdrop}>
-            <View style={styles.costModalContainer}>
-              {status === "Cost Verification" ? (
-                <>
-                  <Text style={styles.modalTitle}>Cost Verification</Text>
-                  {repairEntries.map((entry, index) => (
-                    <View key={index} style={styles.entryContainer}>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="What got repaired?"
-                        placeholderTextColor="#000"
-                        value={entry.whatRepaired}
-                        onChangeText={(text) => handleInputChange(index, "whatRepaired", text)}
-                      />
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Cost ($)"
-                        placeholderTextColor="#000"
-                        value={entry.cost}
-                        onChangeText={(text) => handleInputChange(index, "cost", text)}
-                        keyboardType="numeric"
-                      />
-                      {index < repairEntries.length - 1 && (
-                        <View style={styles.separator} />
+            <View style={styles.modalContainer}>
+              <Text style={styles.modalText}>Status Updated to: {status}</Text>
+              {status === "Cost Verification" && repairCases.length > 0 && (
+                <Text style={styles.costInfoText}>
+                  Final cost sent to customer: ₹{getTotalFinalCost().toFixed(2)}
+                </Text>
+              )}
+              <TouchableOpacity style={styles.modalButton} onPress={closeModal}>
+                <Text style={styles.modalButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Status Update Confirmation Dialog */}
+      <Modal
+        visible={isConfirmationModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setConfirmationModalVisible(false)}
+      >
+        <TouchableWithoutFeedback
+          onPress={() => setConfirmationModalVisible(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalContainer}>
+              <Text style={styles.modalTitle}>Confirm Status Update</Text>
+              <Text style={styles.confirmationText}>
+                Are you sure you want to update status to "{pendingStatus}"?
+              </Text>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={[styles.modalButton, { backgroundColor: "#ccc" }]}
+                  onPress={() => setConfirmationModalVisible(false)}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={confirmStatusUpdate}
+                >
+                  <Text style={styles.modalButtonText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Enhanced Cost Verification Modal */}
+      <Modal
+        visible={isCostModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setCostModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setCostModalVisible(false)}>
+          <View style={styles.modalBackdrop}>
+            <View
+              style={[styles.modalContainer, { width: "90%", padding: 20 }]}
+            >
+              <ScrollView style={{ width: "100%" }}>
+                <Text style={styles.modalTitle}>Cost Verification Details</Text>
+
+                {repairCases.map((caseItem, index) => (
+                  <View key={index} style={styles.repairCaseContainer}>
+                    {repairCases.length > 1 && (
+                      <Text style={styles.caseNumberText}>
+                        Repair Case #{index + 1}
+                      </Text>
+                    )}
+
+                    <Text style={styles.modalLabel}>Issue Diagnosed*</Text>
+                    <TextInput
+                      style={[styles.input, { height: 80 }]}
+                      multiline={true}
+                      placeholder="Describe the issue you diagnosed"
+                      value={caseItem.issueDiagnosed}
+                      onChangeText={(text) =>
+                        updateRepairCase(index, "issueDiagnosed", text)
+                      }
+                    />
+
+                    <Text style={styles.modalLabel}>
+                      Parts Replaced (if any)
+                    </Text>
+                    <TextInput
+                      style={[styles.input, { height: 60 }]}
+                      multiline={true}
+                      placeholder="List any parts that were replaced"
+                      value={caseItem.partsReplaced}
+                      onChangeText={(text) =>
+                        updateRepairCase(index, "partsReplaced", text)
+                      }
+                    />
+
+                    <Text style={styles.modalLabel}>
+                      Estimated Repair Cost (₹)*
+                    </Text>
+                    <TextInput
+                      style={styles.input}
+                      keyboardType="numeric"
+                      placeholder="Enter estimated cost"
+                      value={caseItem.estimatedCost}
+                      onChangeText={(text) =>
+                        updateRepairCase(index, "estimatedCost", text)
+                      }
+                    />
+
+                    {caseItem.estimatedCost &&
+                      !isNaN(parseFloat(caseItem.estimatedCost)) && (
+                        <View style={styles.costBreakdown}>
+                          <Text style={styles.breakdownText}>
+                            Base Cost: ₹
+                            {parseFloat(caseItem.estimatedCost).toFixed(2)}
+                          </Text>
+                          <Text style={styles.breakdownText}>
+                            Service Charge: ₹
+                            {(
+                              calculateFinalCost(caseItem.estimatedCost) -
+                              parseFloat(caseItem.estimatedCost)
+                            ).toFixed(2)}
+                          </Text>
+                          <Text style={styles.finalCostText}>
+                            Final Cost: ₹
+                            {calculateFinalCost(caseItem.estimatedCost).toFixed(
+                              2
+                            )}
+                          </Text>
+                        </View>
                       )}
-                    </View>
-                  ))}
-                  <TouchableOpacity style={styles.addButton} onPress={addRepairEntry}>
-                    <Text style={styles.addButtonText}>+</Text>
+                  </View>
+                ))}
+
+                <TouchableOpacity
+                  onPress={addNewRepairCase}
+                  style={styles.addCaseButton}
+                >
+                  <MaterialIcons name="add-circle" size={24} color="#ff7f00" />
+                  <Text style={styles.addCaseButtonText}>
+                    Add Another Repair Case
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, { backgroundColor: "#ccc" }]}
+                    onPress={() => setCostModalVisible(false)}
+                    disabled={isSubmitting}
+                  >
+                    <Text style={styles.modalButtonText}>Cancel</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.modalButton} onPress={saveToMongoDB}>
-                    <Text style={styles.modalButtonText}>Save</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <View style={styles.modalContainer}>
-                  <Text style={styles.modalText}>Status Updated to: {status}</Text>
-                  <TouchableOpacity style={styles.modalButton} onPress={closeModal}>
-                    <Text style={styles.modalButtonText}>OK</Text>
+                  <TouchableOpacity
+                    style={[styles.modalButton, isSubmitting && styles.disabledButton]}
+                    onPress={handleCostSubmit}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.modalButtonText}>Submit All</Text>
+                    )}
                   </TouchableOpacity>
                 </View>
-              )}
+              </ScrollView>
             </View>
           </View>
         </TouchableWithoutFeedback>
@@ -225,18 +449,13 @@ const TaskDetailScreen = ({ route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { padding: 20, backgroundColor: "#fff5e6" },
+  container: { padding: 20, backgroundColor: "#ffffff" },
   card: {
     marginTop: 30,
     marginBottom: 15,
     padding: 15,
-    borderRadius: 15,
+    borderRadius: 12,
     backgroundColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 5,
   },
   header: {
     flexDirection: "row",
@@ -250,27 +469,10 @@ const styles = StyleSheet.create({
   text: { fontSize: 18, marginLeft: 5, color: "#565656" },
   mapButton: {
     backgroundColor: "#ff7f00",
-    padding: 15,
-    borderRadius: 12,
+    padding: 14,
+    borderRadius: 10,
     marginVertical: 15,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 5,
-  },
-  trackingButton: {
-    backgroundColor: "#2196F3", // Blue for tracking
-    padding: 15,
-    borderRadius: 12,
-    marginVertical: 10,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 5,
   },
   statusTitle: {
     fontSize: 20,
@@ -282,11 +484,11 @@ const styles = StyleSheet.create({
   statusCard: {
     marginVertical: 8,
     padding: 15,
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: "#f0f0f0",
     borderWidth: 1,
     borderColor: "#ddd",
-    elevation: 2,
+    elevation: 1,
     flexDirection: "row",
     alignItems: "center",
   },
@@ -294,7 +496,7 @@ const styles = StyleSheet.create({
   activeCard: {
     backgroundColor: "#ff7f00",
     borderColor: "#e68a00",
-    elevation: 6,
+    elevation: 5,
   },
   cardText: {
     textAlign: "center",
@@ -317,33 +519,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "80%",
     elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-  },
-  costModalContainer: {
-    backgroundColor: "#fff5e6",
-    padding: 25,
-    borderRadius: 20,
-    alignItems: "center",
-    width: "85%",
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    borderColor: "#ff7f00",
-    borderWidth: 2,
-  },
-  modalTitle: {
-    fontSize: 24,
-    marginBottom: 20,
-    textAlign: "center",
-    color: "#000",
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 1,
   },
   modalText: {
     fontSize: 20,
@@ -352,61 +527,99 @@ const styles = StyleSheet.create({
     color: "#333",
     fontWeight: "600",
   },
-  modalButton: {
-    backgroundColor: "#ff7f00",
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    borderRadius: 12,
-    marginTop: 15,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  modalButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  entryContainer: { width: "100%", marginBottom: 15 },
-  input: {
-    backgroundColor: "#fff",
-    padding: 15,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#ff7f00",
-    width: "100%",
-    height: 60,
-    marginBottom: 10,
-    fontSize: 16,
-    color: "#000",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  addButton: {
-    backgroundColor: "#ff7f00",
-    padding: 12,
-    borderRadius: 50,
-    marginVertical: 15,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  addButtonText: {
-    color: "#fff",
+  modalButton: { backgroundColor: "#ff7f00", padding: 12, borderRadius: 10 },
+  modalButtonText: { color: "#fff", fontWeight: "700" },
+  imageDivider: { width: "100%", height: 90, marginVertical: 20 },
+  modalTitle: {
     fontSize: 22,
     fontWeight: "700",
+    marginBottom: 20,
+    color: "#333",
+    textAlign: "center",
   },
-  separator: {
-    height: 1,
-    backgroundColor: "#ff7f00",
-    width: "80%",
-    alignSelf: "center",
+  confirmationText: {
+    fontSize: 16,
+    marginBottom: 25,
+    textAlign: "center",
+    color: "#555",
+  },
+  modalLabel: {
+    fontSize: 16,
+    marginBottom: 8,
+    color: "#555",
+    alignSelf: "flex-start",
+  },
+  input: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+    fontSize: 16,
+  },
+  costBreakdown: {
+    width: "100%",
+    backgroundColor: "#f9f9f9",
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 20,
+  },
+  breakdownText: {
+    fontSize: 15,
+    color: "#555",
+    marginBottom: 5,
+  },
+  finalCostText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#ff7f00",
+    marginTop: 8,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  costText: {
+    fontWeight: "700",
+    color: "#ff7f00",
+  },
+  costInfoText: {
+    fontSize: 16,
+    color: "#ff7f00",
+    fontWeight: "600",
     marginVertical: 10,
+    textAlign: "center",
   },
-  imageDivider: { width: "100%", height: 90, marginVertical: 20 },
+  repairCaseContainer: {
+    marginBottom: 25,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  caseNumberText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#ff7f00",
+    marginBottom: 15,
+  },
+  addCaseButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 10,
+    marginBottom: 20,
+  },
+  addCaseButtonText: {
+    color: "#ff7f00",
+    marginLeft: 8,
+    fontWeight: "600",
+  },
+  disabledButton: {
+    backgroundColor: "#ffb27f",
+    opacity: 0.7,
+  },
 });
 
 export default TaskDetailScreen;
